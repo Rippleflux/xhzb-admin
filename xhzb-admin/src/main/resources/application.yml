@@ -16,7 +16,7 @@ ruoyi:
 # 激活环境
 spring:
   profiles:
-    active: dev
+    active: prod
   ai:
     openai:
       # 模型平台提供的接入地址(看模型平台官网)
