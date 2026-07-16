@@ -42,12 +42,12 @@ pipeline {
         }
         stage('重新构建镜像') {
             steps {
-                echo "当前打镜像tag:${DOCKER_TAG}"
+                echo "当前打镜像tag:${Docker_TAG}"
                 script {
                     for (ds in services.tokenize(",")) {
                          sh "pwd"
                          echo "进入target目录执行镜像打包......"
-                         sh "cd ./${ds}/target/ && docker build -t ${ds}:${DOCKER_TAG} -f ../Dockerfile ."
+                         sh "cd ./${ds}/target/ && docker build -t ${ds}:${Docker_TAG} -f ../Dockerfile ."
                     }
                 }
             }
@@ -59,7 +59,7 @@ pipeline {
                         sh "pwd"
                         sh "cd `pwd`"
                         echo "部署升级:${ws}服务"
-                        sh "chmod +x ./${ws}/deploy.sh && sh ./${ws}/deploy.sh ${ws} ${DOCKER_TAG}"
+                        sh "chmod +x ./${ws}/deploy.sh && sh ./${ws}/deploy.sh ${ws} ${Docker_TAG}"
                     }
                 }
             }
