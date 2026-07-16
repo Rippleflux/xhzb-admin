@@ -1,7 +1,7 @@
 # 开发环境配置
 server:
   # 服务器的HTTP端口，默认为8080
-  port: 8080
+  port: 9000
   servlet:
     # 应用的访问路径
     context-path: /
@@ -19,8 +19,19 @@ server:
 # 日志配置
 logging:
   level:
-    com.xhzb: info
+    com.xhzb: debug
     org.springframework: warn
+    org.springframework.ai: debug # AI对话的日志级别
+    # 推荐配置：开启事务管理器的详细日志，用于观察事务的创建、提交和回滚[reference:6]
+    org.springframework.orm.jpa.JpaTransactionManager: debug
+    # 或者，如果你使用的是JDBC事务管理器，可以用下面这个配置[reference:7][reference:8]
+    # org.springframework.jdbc.support.JdbcTransactionManager: debug
+
+    # 更全面的配置：监控事务拦截器的行为，可以看到事务开始和完成的日志[reference:9]
+    org.springframework.transaction.interceptor: trace
+
+    # 全局事务相关日志，可以获得更全面的信息[reference:11]
+    org.springframework.transaction: debug
 
 # Spring配置
 spring:
@@ -39,17 +50,17 @@ spring:
   devtools:
     restart:
       # 热部署开关
-      enabled: true
+      enabled: false
   datasource:
     driverClassName: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/xhzb?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
+    url: jdbc:mysql://192.168.100.168:3306/xhzb?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
     username: root
-    password: 1234
+    password: heima123
   # redis 配置
   data:
     redis:
       # 地址
-      host: localhost
+      host: 192.168.100.168
       # 端口，默认为6379
       port: 6379
       # 数据库索引
@@ -61,6 +72,19 @@ spring:
       jedis:
         pool:
           enabled: true
+# Springdoc配置
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    tags-sorter: alpha
+  group-configs:
+    - group: 'default'
+      display-name: '测试模块'
+      paths-to-match: '/**'
+      packages-to-scan: com.xhzb
 # oss的配置，要根据自己实际情况来进行修改
 oss:
   endpoint: oss-cn-hangzhou.aliyuncs.com
