@@ -54,3 +54,7 @@ nbdist/
 application-dev.yml
 application-test.yml
 application-prod.yml
+
+CLAUDE.md
+
+需求文档/

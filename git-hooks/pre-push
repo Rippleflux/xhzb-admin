@@ -12,8 +12,11 @@ while read local_ref local_sha remote_ref remote_sha; do
     # ============================================================
     if echo "$remote_ref" | grep -qE 'refs/heads/(master|main)$'; then
         echo "❌ 禁止直接推送到 master/main 分支"
-        echo "   请通过 Pull Request / Merge Request 合并"
-        echo "   如需紧急修复，请联系管理员临时放行"
+        echo ""
+        echo "   请使用合并流程:"
+        echo "   1. feature/* 分支开发 → 合并到 dev 测试"
+        echo "   2. dev 测试通过 → 运行: bash git-hooks/merge-dev-to-master.sh"
+        echo ""
         echo "   临时绕过: git push --no-verify (慎用)"
         exit 1
     fi
@@ -24,6 +27,11 @@ while read local_ref local_sha remote_ref remote_sha; do
     # ============================================================
     BRANCH=$(echo "$local_ref" | sed 's|refs/heads/||')
     BRANCH_PATTERN="^(feature|bugfix|hotfix|release)/(.+)$"
+
+    # dev 分支不受命名规范限制
+    if [ "$BRANCH" = "dev" ]; then
+        continue
+    fi
 
     # 允许临时绕过: tag 推送不校验
     if echo "$local_ref" | grep -q 'refs/tags/'; then

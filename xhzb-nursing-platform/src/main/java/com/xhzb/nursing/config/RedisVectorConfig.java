@@ -5,6 +5,7 @@ import org.springframework.ai.embedding.TokenCountBatchingStrategy;
 import org.springframework.ai.openai.OpenAiEmbeddingModel;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.redis.RedisVectorStore;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import redis.clients.jedis.JedisPooled;
@@ -12,9 +13,18 @@ import redis.clients.jedis.JedisPooled;
 @Configuration
 public class RedisVectorConfig {
 
+    @Value("${redis-stack.host}")
+    private String host;
+
+    @Value("${redis-stack.port}")
+    private int port;
+
+    @Value("${redis-stack.password}")
+    private String password;
+
     @Bean
     public JedisPooled jedisPooled() {
-        return new JedisPooled("192.168.100.168", 6378);
+        return new JedisPooled(host, port, null, password);
     }
 
     @Bean

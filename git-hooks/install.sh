@@ -20,10 +20,17 @@ for hook in commit-msg pre-commit pre-push; do
     fi
 done
 
+# 合并发布脚本（安装到 .git/hooks/ 方便发现，也保留在 git-hooks/）
+cp "$HOOKS_DIR/merge-dev-to-master.sh" "$SCRIPT_DIR/../.git/hooks/merge-dev-to-master.sh"
+chmod +x "$SCRIPT_DIR/../.git/hooks/merge-dev-to-master.sh"
+
 echo ""
 echo "安装完成。以下操作将触发校验:"
 echo "  commit-msg → git commit 时校验提交信息格式"
 echo "  pre-commit → git commit 时校验文件命名/敏感信息/冲突标记"
 echo "  pre-push   → git push 时校验分支命名/禁止推master"
+echo ""
+echo "发布流程:"
+echo "  bash git-hooks/merge-dev-to-master.sh [版本号]"
 echo ""
 echo "如需临时绕过: git <command> --no-verify"

@@ -61,6 +61,11 @@ spring:
       jedis:
         pool:
           enabled: true
+# Redis-Stack 配置（向量存储）
+redis-stack:
+  host: localhost
+  port: 6378
+  password: YOUR_TEST_VALUE_HERE
 # oss的配置，要根据自己实际情况来进行修改
 oss:
   endpoint: oss-cn-beijing.aliyuncs.com

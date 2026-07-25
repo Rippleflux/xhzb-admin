@@ -1,4 +1,4 @@
-# Git Hooks — 企业级提交规范
+# Git Hooks — 企业级提交规范 + 分支工作流
 
 ## 安装
 
@@ -7,6 +7,33 @@ cd xhzb-parent-master
 bash git-hooks/install.sh
 ```
 
+## 分支工作流
+
+```
+feature/smart-bed  ──→  dev  ──→  master + tag
+     ↑                   ↑              ↑
+   功能开发            测试校验        发布上线
+```
+
+1. **功能开发** — 从 `dev` 创建 `feature/*` 分支，开发完成后合并回 `dev`
+2. **测试校验** — `dev` 环境部署测试，通过后进入发布
+3. **发布上线** — 运行脚本合并 `dev` → `master`，自动打 Tag
+
+### 发布命令
+
+```bash
+# 自动递增版本号（根据 commit type 智能判断）
+bash git-hooks/merge-dev-to-master.sh
+
+# 手动指定版本号
+bash git-hooks/merge-dev-to-master.sh v3.10.0
+```
+
+版本号规则：
+- 含 `BREAKING CHANGE` / `feat!:` → 主版本 +1（v1.2.3 → v2.0.0）
+- 含 `feat` → 次版本 +1（v1.2.3 → v1.3.0）
+- 其余 → 修订版本 +1（v1.2.3 → v1.2.4）
+
 ## Hook 清单
 
 | Hook | 触发时机 | 校验内容 |
@@ -14,6 +41,7 @@ bash git-hooks/install.sh
 | `commit-msg` | `git commit` 提交时 | 提交信息格式：`type(scope): subject`、长度≥10字符、主题≤72字符 |
 | `pre-commit` | `git commit` 暂存时 | 文件命名规范、合并冲突标记、调试代码、敏感信息、大文件 |
 | `pre-push` | `git push` 推送时 | 禁止直推 master/main、分支命名规范 |
+| `merge-dev-to-master.sh` | 手动执行 | dev→master 合并 + 自动打 Tag + 推送 |
 
 ## 提交格式
 

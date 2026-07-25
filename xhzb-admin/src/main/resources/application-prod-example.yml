@@ -72,6 +72,11 @@ spring:
       jedis:
         pool:
           enabled: true
+# Redis-Stack 配置（向量存储）
+redis-stack:
+  host: 192.168.100.168
+  port: 6378
+  password: YOUR_PROD_VALUE_HERE
 # Springdoc配置
 springdoc:
   api-docs:

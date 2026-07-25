@@ -2,24 +2,70 @@
 
 > 项目：xhzb-parent
 > 日期：2026-07-25
-> 版本：1.0
+> 版本：1.1（增加分支工作流 + 自动 Tag）
 
 ---
 
-## 一、文件清单
+## 一、分支工作流
+
+```
+feature/smart-bed ──→ dev ──→ master + tag (v3.10.0)
+     ↑                  ↑              ↑
+   功能开发           测试校验        发布上线
+```
+
+### 完整流程
+
+```bash
+# 1. 从 dev 创建功能分支
+git checkout dev
+git pull origin dev
+git checkout -b feature/my-feature
+
+# 2. 开发 + 提交（走 commit-msg 校验）
+git add .
+git commit -m "feat(nursing): 新增XX功能"
+
+# 3. 合并到 dev 测试
+git checkout dev
+git merge feature/my-feature --no-ff
+git push origin dev
+
+# 4. dev 测试通过后 → 发布
+git checkout master
+bash git-hooks/merge-dev-to-master.sh
+
+# 或手动指定版本号
+bash git-hooks/merge-dev-to-master.sh v3.10.0
+```
+
+### 版本号自动规则
+
+`merge-dev-to-master.sh` 检测 dev 新提交的 type，自动递增版本号：
+
+| dev 新提交含 | 版本升级 | 示例 |
+|-------------|---------|------|
+| `BREAKING CHANGE` / `feat!:` | 主版本 | v1.2.3 → v2.0.0 |
+| `feat` | 次版本 | v1.2.3 → v1.3.0 |
+| 其他（fix/docs/chore...） | 修订版本 | v1.2.3 → v1.2.4 |
+
+---
+
+## 二、文件清单
 
 | 文件 | 用途 |
 |------|------|
 | `commit-msg` | 提交信息校验（触发于 `git commit`） |
 | `pre-commit` | 暂存文件检查（触发于 `git commit`） |
-| `pre-push` | 分支保护（触发于 `git push`） |
+| `pre-push` | 分支保护 + master 推送引导（触发于 `git push`） |
+| `merge-dev-to-master.sh` | 发布脚本：dev→master 合并 + 自动 Tag |
 | `install.sh` | 一键安装所有 hooks 到 `.git/hooks/` |
 | `verify.sh` | 自检脚本，模拟各种违规场景 |
 | `README.md` | 快速参考 |
 
 ---
 
-## 二、安装
+## 三、安装
 
 ```bash
 cd xhzb-parent-master
@@ -34,13 +80,16 @@ bash git-hooks/install.sh
   ✅ pre-commit
   ✅ pre-push
 安装完成。
+
+发布流程:
+  bash git-hooks/merge-dev-to-master.sh [版本号]
 ```
 
 ---
 
-## 三、commit-msg 详细规则
+## 四、commit-msg 详细规则
 
-### 3.1 校验项
+### 4.1 校验项
 
 | 校验 | 规则 | 示例 |
 |------|------|------|
@@ -50,7 +99,7 @@ bash git-hooks/install.sh
 | 主题行长度 | ≤ 72 字符（警告不阻断） | 73字符 → ⚠️ |
 | 禁止注释行 | 不允许 `#` 开头 | `"# 测试"` → ❌ |
 
-### 3.2 支持的 type
+### 4.2 支持的 type
 
 | type | 说明 | 示例 |
 |------|------|------|
@@ -66,20 +115,11 @@ bash git-hooks/install.sh
 | build | 依赖变更 | `build: 添加influxdb-client依赖` |
 | revert | 回退 | `revert: 回退feat(nursing)提交` |
 
-### 3.3 验证结果
-
-| 测试用例 | 预期 | 结果 |
-|---------|------|------|
-| 空提交 | 拦截 | ✅ |
-| `"fix"` (3字符) | 拦截 | ✅ |
-| `"新增功能但没有type前缀"` | 拦截 | ✅ |
-| `"feat(nursing): 新增智能床位报警推送"` | 通过 | ✅ |
-
 ---
 
-## 四、pre-commit 详细规则
+## 五、pre-commit 详细规则
 
-### 4.1 校验项
+### 5.1 校验项
 
 | 校验 | 规则 |
 |------|------|
@@ -90,26 +130,18 @@ bash git-hooks/install.sh
 | 敏感信息 | 拦截 `password` / `secret` / `token` / `api_key`（排除 test 文件） |
 | 大文件 | 警告 >1MB |
 
-### 4.2 敏感信息检测
-
-只检测新增行（`git diff --cached` 的 `+` 行），排除：
-- 测试文件（`*Test*.java`）
-- getter/setter 方法
-- import 语句
-- 注释行
-
 ---
 
-## 五、pre-push 详细规则
+## 六、pre-push 详细规则
 
-### 5.1 校验项
+### 6.1 校验项
 
 | 校验 | 规则 |
 |------|------|
-| 禁止直推 master | `refs/heads/master` 和 `refs/heads/main` 均拦截 |
+| 禁止直推 master | `refs/heads/master` 和 `refs/heads/main` 均拦截，提示使用 `merge-dev-to-master.sh` |
 | 分支命名 | `type/description` 格式 |
 
-### 5.2 支持的分支类型
+### 6.2 支持的推送分支类型
 
 | type | 用途 | 示例 |
 |------|------|------|
@@ -118,37 +150,9 @@ bash git-hooks/install.sh
 | hotfix | 紧急修复 | `hotfix/npe-in-device-controller` |
 | release | 发布分支 | `release/v3.9.1` |
 
-### 5.3 验证结果
-
-| 测试用例 | 预期 | 结果 |
-|---------|------|------|
-| 推送到 `refs/heads/master` | 拦截 | ✅ |
-| 分支名 `mywork` | 拦截 | ✅ |
-| 分支名 `feature/alert` | 通过 | ✅ |
-
 ---
 
-## 六、使用示例
-
-### 规范提交流程
-
-```bash
-# 1. 创建分支
-git checkout -b feature/smart-bed-alert
-
-# 2. 开发...
-
-# 3. 提交（符合格式）
-git add .
-git commit -m "feat(nursing): 新增智能床位报警WebSocket推送"
-
-# 4. 推送
-git push origin feature/smart-bed-alert
-
-# 5. 创建 PR → 合并到 master
-```
-
-### 临时绕过
+## 七、临时绕过
 
 ```bash
 git commit --no-verify -m "临时提交，后续补充"
@@ -157,7 +161,7 @@ git push --no-verify
 
 ---
 
-## 七、自定义
+## 八、自定义
 
 编辑对应 hook 文件，修改变量即可调整阈值：
 
@@ -166,30 +170,3 @@ git push --no-verify
 | commit-msg | `MIN_LENGTH` | 10 |
 | commit-msg | `MAX_SUBJECT_LEN` | 72 |
 | pre-push | `BRANCH_PATTERN` | `^(feature\|bugfix\|hotfix\|release)/(.+)$` |
-
----
-
-## 八、验证脚本结果
-
-```
-============================================
- Git Hooks 验证测试
-============================================
-[commit-msg]
-  ✅ 空提交被拦截
-  ✅ 过短提交拦截
-  ✅ 合格提交通过
-  ✅ 无type拦截
-
-[pre-push]
-  ✅ 推master拦截
-  ✅ 不规范分支名拦截
-  ✅ 规范分支通过
-
-[pre-commit]
-  ✅ 无违规文件通过
-
-============================================
- 结果: 8 通过 / 0 失败
-============================================
-```
