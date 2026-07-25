@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import com.xhzb.system.domain.SysUserRole;
 
 /**
@@ -62,4 +63,15 @@ public interface SysUserRoleMapper
      * @return 结果
      */
     public int deleteUserRoleInfos(@Param("roleId") Long roleId, @Param("userIds") Long[] userIds);
+
+    /**
+     * 通过角色标识符(role_key)查询该角色下所有用户ID
+     *
+     * @param roleKey 角色标识符，如 nursing_elder / admin / administrator
+     * @return 用户ID列表
+     */
+    @Select("SELECT sur.user_id FROM sys_user_role sur " +
+            "LEFT JOIN sys_role sr ON sur.role_id = sr.role_id " +
+            "WHERE sr.role_key = #{roleKey}")
+    List<Long> selectUserIdByRoleKey(String roleKey);
 }

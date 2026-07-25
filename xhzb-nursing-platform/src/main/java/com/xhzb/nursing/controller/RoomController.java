@@ -116,4 +116,14 @@ public class RoomController extends BaseController
         return R.ok(roomService.getRoomOne(id));
     }
 
+    /**
+     * 获取房间中的智能设备及数据
+     */
+    @GetMapping("/getRoomsWithDeviceByFloorId/{floorId}")
+    @Operation(summary = "获取房间中的智能设备及数据", description = "根据楼层ID查询房间、床位、老人、设备基础信息，设备最新数据从Redis读取")
+    public R<List<RoomVo>> getRoomsWithDeviceByFloorId(@Schema(name = "楼层ID", requiredMode = Schema.RequiredMode.REQUIRED) @PathVariable("floorId") Long floorId) {
+        List<RoomVo> list = roomService.getRoomsWithDeviceByFloorId(floorId);
+        return R.ok(list);
+    }
+
 }

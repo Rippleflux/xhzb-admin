@@ -21,7 +21,6 @@ import com.xhzb.nursing.mapper.KnowledgeBaseMapper;
 import com.xhzb.nursing.domain.KnowledgeBase;
 import com.xhzb.nursing.service.IKnowledgeBaseService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import java.util.Arrays;
 
 /**
  * 知识库Service业务层处理

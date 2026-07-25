@@ -1,5 +1,6 @@
 package com.xhzb;
 
+import com.xhzb.nursing.service.WechatService;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.ExtractedTextFormatter;
@@ -23,6 +24,8 @@ public class RedisVectorTest {
 
     @Autowired
     private VectorStore vectorStore;
+
+
 
     @Test
     public void test(){

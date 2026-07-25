@@ -55,7 +55,7 @@ spring:
     driverClassName: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://192.168.100.168:3306/xhzb?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
     username: root
-    password: heima123
+    password: YOUR_PROD_VALUE_HERE
   # redis 配置
   data:
     redis:
@@ -66,7 +66,7 @@ spring:
       # 数据库索引
       database: 0
       # 密码
-      password: 123456
+      password: YOUR_PROD_VALUE_HERE
       # 连接超时时间
       timeout: 10s
       jedis:
@@ -91,3 +91,17 @@ oss:
   accessKeyId: ${OSS_ACCESS_KEY_ID}
   accessKeySecret: ${OSS_ACCESS_KEY_SECRET}
   bucketName: qk-admin-oss
+
+huaweicloud:
+  #mqtt协议相关配置
+  ak: HPUAVLT4P2VKIJXK94CS
+  sk: iwrRBBZ4IwrCogPgzPhb5xWqjQftCbxl6EeJW9ES
+  regionId: cn-east-3
+  endpoint: f10b6f8b75.st1.iotda-app.cn-east-3.myhuaweicloud.com
+
+  projectId: 019f75195f207fdb99b03d7ed66bfbd5
+  #amqp协议相关配置
+  host: f10b6f8b75.st1.iotda-app.cn-east-3.myhuaweicloud.com
+  accessKey: YOUR_PROD_VALUE_HERE
+  accessCode: YOUR_PROD_VALUE_HERE
+  queueName: DefaultQueue   #默认无需改动

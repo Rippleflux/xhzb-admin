@@ -8,7 +8,6 @@ import com.xhzb.nursing.domain.dto.NursingProjectPlanDto;
 import com.xhzb.nursing.domain.vo.NursingProjectPlanVo;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
 
 /**
  * 护理计划和项目关联Mapper接口

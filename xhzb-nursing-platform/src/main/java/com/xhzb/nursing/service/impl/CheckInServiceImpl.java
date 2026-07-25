@@ -6,12 +6,10 @@ import java.util.List;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.json.JSONArray;
-import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xhzb.common.exception.ServiceException;
-import com.xhzb.common.utils.DateUtils;
 import com.xhzb.common.utils.StringUtils;
 import com.xhzb.nursing.domain.*;
 import com.xhzb.nursing.domain.dto.checkIn.*;
@@ -28,7 +26,6 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
-import java.util.stream.Collectors;
 
 /**
  * 入住管理Service业务层处理

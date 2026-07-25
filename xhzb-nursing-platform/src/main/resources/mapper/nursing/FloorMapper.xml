@@ -135,4 +135,23 @@
 
     </select>
 
+    <!-- 获取所有智能楼层：EXISTS短路策略 -->
+    <select id="getAllFloorsWithDevice" resultType="com.xhzb.nursing.domain.vo.FloorVo">
+        SELECT f.id, f.name, f.code FROM floor f WHERE
+        EXISTS (
+            SELECT 1 FROM room r
+            INNER JOIN device d ON d.binding_location = r.id
+                AND d.location_type = 1 AND d.physical_location_type = 1
+            WHERE r.floor_id = f.id
+        )
+        OR EXISTS (
+            SELECT 1 FROM room r
+            INNER JOIN bed b ON b.room_id = r.id
+            INNER JOIN device d ON d.binding_location = b.id
+                AND d.location_type = 1 AND d.physical_location_type = 2
+            WHERE r.floor_id = f.id
+        )
+        ORDER BY f.code, f.create_time DESC
+    </select>
+
 </mapper>

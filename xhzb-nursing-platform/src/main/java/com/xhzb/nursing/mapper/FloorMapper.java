@@ -68,4 +68,11 @@ public interface FloorMapper extends BaseMapper<Floor>
     List<Floor> selectAllByNur();
 
     List<TreeVo> getRoomAndBedByBedStatus(Integer status);
+
+    /**
+     * 获取所有智能楼层（存在绑定固定IoT设备的楼层）
+     *
+     * @return 楼层VO列表
+     */
+    List<FloorVo> getAllFloorsWithDevice();
 }

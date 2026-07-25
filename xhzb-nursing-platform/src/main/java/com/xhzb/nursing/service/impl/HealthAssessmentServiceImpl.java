@@ -38,7 +38,6 @@ import com.xhzb.nursing.service.IHealthAssessmentService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
 

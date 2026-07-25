@@ -4,7 +4,6 @@ import java.util.List;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xhzb.common.exception.ServiceException;
-import com.xhzb.common.exception.base.BaseException;
 import com.xhzb.nursing.domain.NursingProjectPlan;
 import com.xhzb.nursing.domain.vo.NursingProjectVo;
 import com.xhzb.nursing.mapper.NursingProjectPlanMapper;

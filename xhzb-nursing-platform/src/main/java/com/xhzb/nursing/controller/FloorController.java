@@ -6,9 +6,9 @@ import com.xhzb.common.core.domain.AjaxResult;
 import com.xhzb.common.core.domain.R;
 import com.xhzb.common.enums.BusinessType;
 import com.xhzb.nursing.domain.Floor;
+import com.xhzb.nursing.domain.vo.FloorVo;
 import com.xhzb.nursing.domain.vo.TreeVo;
 import com.xhzb.nursing.service.IFloorService;
-import com.xhzb.nursing.domain.vo.FloorVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -103,5 +103,16 @@ public class FloorController extends BaseController
     public R<List<TreeVo>> getRoomAndBedByBedStatus(@PathVariable("status") Integer status) {
         List<TreeVo> treeVoList = floorService.getRoomAndBedByBedStatus(status);
         return R.ok(treeVoList);
+    }
+
+    /**
+     * 获取所有智能楼层
+     * 仅返回存在绑定固定IoT设备（房间或床位）的楼层，去重
+     */
+    @GetMapping("/getAllFloorsWithDevice")
+    @Operation(summary = "获取所有智能楼层", description = "返回存在绑定固定IoT设备的楼层列表，无设备楼层不返回")
+    public AjaxResult getAllFloorsWithDevice() {
+        List<FloorVo> list = floorService.getAllFloorsWithDevice();
+        return success(list);
     }
 }

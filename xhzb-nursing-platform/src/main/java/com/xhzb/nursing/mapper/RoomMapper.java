@@ -70,4 +70,12 @@ public interface RoomMapper extends BaseMapper<Room>
 
 
     RoomVo getRoomOne(Long id);
+
+    /**
+     * 根据楼层ID查询房间中的智能设备及数据（LEFT JOIN + WHERE过滤）
+     *
+     * @param floorId 楼层ID
+     * @return 房间VO列表
+     */
+    List<RoomVo> getRoomsWithDeviceByFloorId(Long floorId);
 }

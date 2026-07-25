@@ -27,9 +27,7 @@ public class TableDataInfo<T> implements Serializable
     /**
      * 表格数据对象
      */
-    public TableDataInfo()
-    {
-    }
+    public TableDataInfo() {}
 
     /**
      * 分页

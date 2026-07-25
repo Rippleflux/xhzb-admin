@@ -2,10 +2,10 @@ package com.xhzb.nursing.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xhzb.nursing.domain.Floor;
+import com.xhzb.nursing.domain.vo.FloorVo;
 import com.xhzb.nursing.domain.vo.TreeVo;
 import com.xhzb.nursing.mapper.FloorMapper;
 import com.xhzb.nursing.service.IFloorService;
-import com.xhzb.nursing.domain.vo.FloorVo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -97,5 +97,15 @@ public class FloorServiceImpl extends ServiceImpl<FloorMapper, Floor> implements
     @Override
     public List<TreeVo> getRoomAndBedByBedStatus(Integer status) {
         return floorMapper.getRoomAndBedByBedStatus(status);
+    }
+
+    /**
+     * 获取所有智能楼层
+     *
+     * @return 楼层VO列表
+     */
+    @Override
+    public List<FloorVo> getAllFloorsWithDevice() {
+        return floorMapper.getAllFloorsWithDevice();
     }
 }

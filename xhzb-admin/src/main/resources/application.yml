@@ -16,7 +16,7 @@ ruoyi:
 # 激活环境
 spring:
   profiles:
-    active: prod
+    active: dev
   ai:
     openai:
       # 模型平台提供的接入地址(看模型平台官网)
@@ -58,7 +58,7 @@ token:
   # 令牌密钥
   secret: abcdefghijklmnopqrstuvwxyz
   # 令牌有效期（默认30分钟）
-  expireTime: 30
+  expireTime: 30000
 # MyBatisPlus配置
 mybatis-plus:
   # 搜索指定包别名
@@ -94,3 +94,6 @@ xss:
   # 匹配链接
   urlPatterns: /system/*,/monitor/*,/tool/*
 
+wechat:
+  appid: wxf5610bcdf6a85efc
+  secret: e20e066ececcafa252f034b53291a221

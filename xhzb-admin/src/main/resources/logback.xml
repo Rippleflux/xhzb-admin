@@ -11,6 +11,40 @@
 			<pattern>${log.pattern}</pattern>
 		</encoder>
 	</appender>
+
+
+<!--    <appender name="logstash" class="net.logstash.logback.appender.LogstashTcpSocketAppender">-->
+<!--        &lt;!&ndash;logstash的服务地址和端口，可以实际情况设置&ndash;&gt;-->
+<!--        <destination>192.168.100.168:5044</destination>-->
+<!--        &lt;!&ndash; 日志输出编码 &ndash;&gt;-->
+<!--        <encoder charset="UTF-8" class="net.logstash.logback.encoder.LogstashEncoder">-->
+<!--            <providers>-->
+<!--                <timestamp>-->
+<!--                    <timeZone>UTC</timeZone>-->
+<!--                </timestamp>-->
+<!--                <pattern>-->
+<!--                    <pattern>-->
+<!--                        {-->
+<!--                        &lt;!&ndash;应用名称 &ndash;&gt;-->
+<!--                        "app": "xhzb-admin",-->
+<!--                        &lt;!&ndash;打印时间 &ndash;&gt;-->
+<!--                        "timestamp": "%d{yyyy-MM-dd HH:mm:ss.SSS}",-->
+<!--                        &lt;!&ndash;线程名称 &ndash;&gt;-->
+<!--                        "thread": "%thread",-->
+<!--                        &lt;!&ndash;日志级别 &ndash;&gt;-->
+<!--                        "level": "%level",-->
+<!--                        &lt;!&ndash;日志名称 &ndash;&gt;-->
+<!--                        "logger_name": "%logger",-->
+<!--                        &lt;!&ndash;日志信息 &ndash;&gt;-->
+<!--                        "message": "%msg",-->
+<!--                        &lt;!&ndash;日志堆栈 &ndash;&gt;-->
+<!--                        "stack_trace": "%exception"-->
+<!--                        }-->
+<!--                    </pattern>-->
+<!--                </pattern>-->
+<!--            </providers>-->
+<!--        </encoder>-->
+<!--    </appender>-->
 	
 	<!-- 系统日志输出 -->
 	<appender name="file_info" class="ch.qos.logback.core.rolling.RollingFileAppender">
@@ -77,6 +111,7 @@
 	<logger name="org.springframework" level="warn" />
 
 	<root level="info">
+<!--        <appender-ref ref="logstash" />-->
 		<appender-ref ref="console" />
 	</root>
 	

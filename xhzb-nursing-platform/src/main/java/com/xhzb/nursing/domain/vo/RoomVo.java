@@ -1,5 +1,6 @@
 package com.xhzb.nursing.domain.vo;
 
+import com.xhzb.nursing.domain.vo.DeviceInfo;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -29,5 +30,8 @@ public class RoomVo {
 
     @Schema(title = "床位列表")
     private List<BedVo> bedVoList;
+
+    @Schema(title = "关联的设备")
+    private List<DeviceInfo> deviceVos;
 
 }

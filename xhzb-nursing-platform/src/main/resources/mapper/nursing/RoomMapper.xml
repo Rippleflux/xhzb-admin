@@ -187,4 +187,63 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             #{id}
         </foreach>
     </delete>
+
+    <!-- 智能床位：房间设备+数据 ResultMap -->
+    <resultMap id="roomVoWithDeviceResultMap" type="com.xhzb.nursing.domain.vo.RoomVo">
+        <id column="id" property="id"/>
+        <result column="code" property="code"/>
+        <collection property="bedVoList" ofType="com.xhzb.nursing.domain.vo.BedVo">
+            <id column="bid" property="id"/>
+            <result column="bed_number" property="bedNumber"/>
+            <result column="bed_status" property="bedStatus"/>
+            <result column="eid" property="elderId"/>
+            <result column="ename" property="ename"/>
+            <collection property="deviceVos" ofType="com.xhzb.nursing.domain.vo.DeviceInfo">
+                <id column="b_did" property="id"/>
+                <result column="b_iot_id" property="iotId"/>
+                <result column="b_device_name" property="deviceName"/>
+                <result column="b_product_key" property="productKey"/>
+                <result column="b_product_name" property="productName"/>
+            </collection>
+        </collection>
+        <collection property="deviceVos" ofType="com.xhzb.nursing.domain.vo.DeviceInfo">
+            <id column="did" property="id"/>
+            <result column="iot_id" property="iotId"/>
+            <result column="device_name" property="deviceName"/>
+            <result column="product_key" property="productKey"/>
+            <result column="product_name" property="productName"/>
+        </collection>
+    </resultMap>
+
+    <!-- 获取房间智能设备及数据：LEFT JOIN + WHERE过滤 -->
+    <select id="getRoomsWithDeviceByFloorId" resultMap="roomVoWithDeviceResultMap">
+        SELECT r.id,
+               r.code,
+               b.id         AS bid,
+               b.bed_number,
+               b.bed_status,
+               e.id         AS eid,
+               e.name       AS ename,
+               d.id         AS did,
+               d.iot_id,
+               d.device_name,
+               d.product_key,
+               d.product_name,
+               dd.id        AS b_did,
+               dd.iot_id    AS b_iot_id,
+               dd.device_name AS b_device_name,
+               dd.product_key AS b_product_key,
+               dd.product_name AS b_product_name
+        FROM room r
+                 LEFT JOIN bed b ON r.id = b.room_id
+                 LEFT JOIN elder e ON b.id = e.bed_id
+                 LEFT JOIN device d ON d.binding_location = r.id
+            AND d.location_type = 1
+            AND d.physical_location_type = 1
+                 LEFT JOIN device dd ON dd.binding_location = b.id
+            AND dd.location_type = 1
+            AND dd.physical_location_type = 2
+        WHERE r.floor_id = #{floorId}
+          AND (d.id IS NOT NULL OR dd.id IS NOT NULL)
+    </select>
 </mapper>

@@ -64,4 +64,12 @@ public interface IFloorService extends IService<Floor>
 
     List<TreeVo> getRoomAndBedByBedStatus(Integer status);
 
+    /**
+     * 获取所有智能楼层
+     * 仅返回存在绑定固定IoT设备（房间或床位）的楼层
+     *
+     * @return 楼层VO列表
+     */
+    List<FloorVo> getAllFloorsWithDevice();
+
 }

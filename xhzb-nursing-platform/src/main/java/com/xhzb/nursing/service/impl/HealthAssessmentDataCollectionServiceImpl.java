@@ -2,14 +2,12 @@ package com.xhzb.nursing.service.impl;
 
 import java.util.List;
 
-import com.xhzb.common.utils.DateUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.xhzb.nursing.mapper.HealthAssessmentDataCollectionMapper;
 import com.xhzb.nursing.domain.HealthAssessmentDataCollection;
 import com.xhzb.nursing.service.IHealthAssessmentDataCollectionService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 

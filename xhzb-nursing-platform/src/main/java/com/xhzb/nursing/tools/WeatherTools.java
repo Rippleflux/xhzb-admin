@@ -1,7 +1,6 @@
 package com.xhzb.nursing.tools;
 
 import cn.hutool.http.HttpUtil;
-import com.xhzb.nursing.domain.dto.WeatherDto;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
