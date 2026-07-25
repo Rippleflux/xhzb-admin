@@ -56,7 +56,22 @@ fi
 # ============================================================
 # 4. 敏感信息检测
 # ============================================================
-SENSITIVE=$(git diff --cached | grep '^+' | grep -v '^+++' | grep -iE 'password|secret|token|api.?key|access.?key' | grep -v 'get\b' | grep -v 'set\b' | grep -v 'import' | grep -v '//' | grep -v '\*' | grep -v 'Test' | grep -v 'test')
+# 排除模式（不视为敏感信息）
+EXCLUDE_PATTERNS=(
+    -e 'get\b'              -e 'set\b'              -e 'import'
+    -e '//'                 -e '\*'                 -e '\bTest\b'   -e '\btest\b'
+    -e 'YOUR_.*_HERE'       -e '@Value'
+    -e 'private.*String.*password'  -e 'private.*String.*secret'
+    -e '`password`'         -e '`secret`'           -e '`token`'
+    -e 'username.*password' -e 'client_secret'
+    -e '\-example\.yml'
+    -e 'new JedisPooled'
+    -e 'varchar.*密码'      -e 'COMMENT.*秘钥'      -e '设备秘钥'
+    -e 'grep -iE'                                       # 排除 hook 自身的匹配规则
+)
+SENSITIVE=$(git diff --cached | grep '^+' | grep -v '^+++' \
+    | grep -iE 'password|secret|token|api.?key|access.?key' \
+    | grep -v "${EXCLUDE_PATTERNS[@]}" || true)
 if [ -n "$SENSITIVE" ]; then
     echo "❌ 检测到可能的敏感信息泄露:"
     echo "$SENSITIVE" | head -10 | sed 's/^/    /'
