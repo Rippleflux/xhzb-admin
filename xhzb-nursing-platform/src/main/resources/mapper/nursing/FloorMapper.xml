@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xhzb.nursing.mapper.FloorMapper">
+
+    <resultMap type="Floor" id="FloorResult">
+        <result property="id" column="id"/>
+        <result property="name" column="name"/>
+        <result property="code" column="code"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="createBy" column="create_by"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="selectFloorVo">
+        select id,
+               name,
+               code,
+               create_time,
+               update_time,
+               create_by,
+               update_by,
+               remark
+        from floor
+    </sql>
+
+    <select id="selectFloorList" parameterType="Floor" resultMap="FloorResult">
+        <include refid="selectFloorVo"/>
+        <where>
+            <if test="name != null  and name != ''">and name like concat('%', #{name}, '%')</if>
+            <if test="code != null ">and code = #{code}</if>
+        </where>
+    </select>
+
+    <select id="selectFloorById" parameterType="Long" resultMap="FloorResult">
+        <include refid="selectFloorVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="selectAllByNur" resultType="com.xhzb.nursing.domain.Floor">
+        select f.*
+        from floor f
+                 left join room r on r.floor_id = f.id
+                 left join bed b on b.room_id = r.id
+                 left join elder e on e.bed_id = b.id
+        where b.bed_status = 1
+        group by f.id
+        order by code, create_time desc
+    </select>
+
+    <insert id="insertFloor" parameterType="Floor" useGeneratedKeys="true" keyProperty="id">
+        insert into floor
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="name != null">name,</if>
+            <if test="code != null">code,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="updateTime != null">update_time,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="updateBy != null">update_by,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="name != null">#{name},</if>
+            <if test="code != null">#{code},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="updateTime != null">#{updateTime},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="updateBy != null">#{updateBy},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+    <update id="updateFloor" parameterType="Floor">
+        update floor
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="name != null">name = #{name},</if>
+            <if test="code != null">code = #{code},</if>
+            <if test="createTime != null">create_time = #{createTime},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+            <if test="createBy != null">create_by = #{createBy},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteFloorById" parameterType="Long">
+        delete
+        from floor
+        where id = #{id}
+    </delete>
+
+    <delete id="deleteFloorByIds" parameterType="String">
+        delete from floor where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+
+    <resultMap id="TreeVoResultMap" type="com.xhzb.nursing.domain.vo.TreeVo">
+        <!--楼层数据映射-->
+        <id column="f_id" property="value"/>
+        <result column="f_name" property="label"/>
+
+        <!--房间数据映射-->
+        <collection property="children" ofType="com.xhzb.nursing.domain.vo.TreeVo">
+            <id column="r_id" property="value"></id>
+            <result column="r_code" property="label"></result>
+
+            <!--床位数据映射-->
+            <collection property="children" ofType="com.xhzb.nursing.domain.vo.TreeVo">
+                <id column="b_id" property="value"></id>
+                <result column="b_bed_number" property="label"></result>
+            </collection>
+        </collection>
+    </resultMap>
+
+    <select id="getRoomAndBedByBedStatus" resultMap="TreeVoResultMap">
+        select f.id         f_id,
+               f.name       f_name,
+               r.id         r_id,
+               r.code       r_code,
+               b.id         b_id,
+               b.bed_number b_bed_number
+        from floor f,
+             room r,
+             bed b
+        where f.id = r.floor_id
+          and r.id = b.room_id
+          and b.bed_status = #{status}
+
+    </select>
+
+    <!-- 获取所有智能楼层：EXISTS短路策略 -->
+    <select id="getAllFloorsWithDevice" resultType="com.xhzb.nursing.domain.vo.FloorVo">
+        SELECT f.id, f.name, f.code FROM floor f WHERE
+        EXISTS (
+            SELECT 1 FROM room r
+            INNER JOIN device d ON d.binding_location = r.id
+                AND d.location_type = 1 AND d.physical_location_type = 1
+            WHERE r.floor_id = f.id
+        )
+        OR EXISTS (
+            SELECT 1 FROM room r
+            INNER JOIN bed b ON b.room_id = r.id
+            INNER JOIN device d ON d.binding_location = b.id
+                AND d.location_type = 1 AND d.physical_location_type = 2
+            WHERE r.floor_id = f.id
+        )
+        ORDER BY f.code, f.create_time DESC
+    </select>
+
+</mapper>

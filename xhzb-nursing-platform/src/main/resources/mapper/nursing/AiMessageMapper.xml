@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xhzb.nursing.mapper.AiMessageMapper">
+
+    <resultMap type="com.xhzb.nursing.domain.AiMessage" id="AiMessageResult">
+        <result property="id" column="id"/>
+        <result property="conversationId" column="conversation_id"/>
+        <result property="content" column="content"/>
+        <result property="type" column="type"/>
+        <result property="createBy" column="create_by"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+
+    <select id="selectMessagesByConversationId" parameterType="Long" resultMap="AiMessageResult">
+        select *
+        from ai_message
+        where conversation_id = #{conversationId}
+        order by create_time
+    </select>
+
+    <delete id="deleteByConversationId" parameterType="Long">
+        delete
+        from ai_message
+        where conversation_id = #{conversationId}
+    </delete>
+
+</mapper>
