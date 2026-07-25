@@ -1,0 +1,79 @@
+#!/bin/bash
+# ============================================================
+# Git Pre-Commit Hook — 文件级检查
+# 安装: cp pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+# ============================================================
+
+# ============================================================
+# 1. 文件命名规范检查
+# ============================================================
+INVALID_FILES=""
+
+# Java 文件必须 PascalCase
+INVALID_FILES+=$(git diff --cached --name-only --diff-filter=ACM | grep '\.java$' | grep -vE '(^|/)[A-Z][a-zA-Z0-9]*\.java$' | sed 's/^/    /')
+
+# XML 文件必须 PascalCase 或 kebab-case
+INVALID_FILES+=$(git diff --cached --name-only --diff-filter=ACM | grep '\.xml$' | grep -vE '(^|/)([A-Z][a-zA-Z0-9]*|[a-z][a-z0-9]*(-[a-z0-9]+)*)\.xml$' | sed 's/^/    /')
+
+# 禁止临时文件和 IDE 配置
+TEMP_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '(~$|\.bak$|\.tmp$|\.orig$|\.iml$|\.class$)' | sed 's/^/    /')
+INVALID_FILES+=$TEMP_FILES
+
+if [ -n "$INVALID_FILES" ]; then
+    echo "❌ 以下文件命名不规范或为禁止文件:"
+    echo "$INVALID_FILES"
+    echo ""
+    echo "   规范:"
+    echo "     .java   → PascalCase (如 AlertRuleServiceImpl.java)"
+    echo "     .xml    → PascalCase 或 kebab-case (如 RoomMapper.xml)"
+    echo "     .yml    → kebab-case (如 application-dev.yml)"
+    echo "     .md     → 中文或 kebab-case"
+    echo ""
+    echo "   禁止提交: ~ .bak .tmp .orig .iml .class"
+    exit 1
+fi
+
+# ============================================================
+# 2. 检查是否有未解决的合并冲突标记
+# ============================================================
+CONFLICT_FILES=$(git diff --cached --name-only | xargs grep -l '<<<<<<<\|=======\|>>>>>>>' 2>/dev/null)
+if [ -n "$CONFLICT_FILES" ]; then
+    echo "❌ 以下文件存在未解决的合并冲突:"
+    echo "$CONFLICT_FILES" | sed 's/^/    /'
+    exit 1
+fi
+
+# ============================================================
+# 3. 检查是否有调试代码（console.log / System.out.println）
+# ============================================================
+DEBUG_PRINTS=$(git diff --cached --diff-filter=ACM | grep '^+' | grep -E 'System\.out\.print|console\.log|print_r|var_dump|dd\(' | sed 's/^/    /')
+if [ -n "$DEBUG_PRINTS" ]; then
+    echo "⚠️  警告: 检测到可能残留的调试代码"
+    echo "$DEBUG_PRINTS" | head -5
+    echo "   建议检查后移除"
+fi
+
+# ============================================================
+# 4. 敏感信息检测
+# ============================================================
+SENSITIVE=$(git diff --cached | grep '^+' | grep -v '^+++' | grep -iE 'password|secret|token|api.?key|access.?key' | grep -v 'get\b' | grep -v 'set\b' | grep -v 'import' | grep -v '//' | grep -v '\*' | grep -v 'Test' | grep -v 'test')
+if [ -n "$SENSITIVE" ]; then
+    echo "❌ 检测到可能的敏感信息泄露:"
+    echo "$SENSITIVE" | head -10 | sed 's/^/    /'
+    echo ""
+    echo "   请将敏感配置移到:"
+    echo "     application-dev.yml (使用 ${ENV_VAR} 占位)"
+    echo "     或环境变量 / K8s Secret"
+    exit 1
+fi
+
+# ============================================================
+# 5. 大文件检测（>1MB）
+# ============================================================
+BIG_FILES=$(git diff --cached --name-only | xargs ls -l 2>/dev/null | awk '$5 > 1048576 {print $NF}')
+if [ -n "$BIG_FILES" ]; then
+    echo "⚠️  警告: 检测到大文件（>1MB），建议使用 Git LFS:"
+    echo "$BIG_FILES" | sed 's/^/    /'
+fi
+
+exit 0

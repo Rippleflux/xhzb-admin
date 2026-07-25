@@ -1,0 +1,79 @@
+#!/bin/bash
+# ============================================================
+# Git Commit Message Hook — 企业级提交规范校验
+# 安装: cp commit-msg .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg
+# ============================================================
+
+COMMIT_MSG_FILE=$1
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# ============================================================
+# 1. 禁止空提交信息
+# ============================================================
+if [ -z "$COMMIT_MSG" ]; then
+    echo "❌ 提交信息不能为空"
+    exit 1
+fi
+
+# ============================================================
+# 2. 最低长度校验（≥10字符）
+# ============================================================
+MIN_LENGTH=10
+ACTUAL_LENGTH=${#COMMIT_MSG}
+if [ $ACTUAL_LENGTH -lt $MIN_LENGTH ]; then
+    echo "❌ 提交信息长度不足 (当前 ${ACTUAL_LENGTH} 字符, 要求 ≥ ${MIN_LENGTH} 字符)"
+    echo "   请描述本次提交的内容和原因"
+    exit 1
+fi
+
+# ============================================================
+# 3. 提交格式规范: type(scope): subject
+#    可选 type: feat fix docs style refactor perf test chore ci build revert
+# ============================================================
+COMMIT_PATTERN="^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(\(.*\))?: .+"
+
+if ! echo "$COMMIT_MSG" | head -1 | grep -qE "$COMMIT_PATTERN"; then
+    echo "❌ 提交信息格式不符合规范"
+    echo ""
+    echo "   要求格式: type(scope): subject"
+    echo ""
+    echo "   支持的 type:"
+    echo "     feat     — 新功能"
+    echo "     fix      — 修Bug"
+    echo "     docs     — 文档变更"
+    echo "     style    — 代码格式（空格、缩进、分号等，不影响逻辑）"
+    echo "     refactor — 重构（不新增功能、不修Bug）"
+    echo "     perf     — 性能优化"
+    echo "     test     — 测试相关"
+    echo "     chore    — 构建/工具/依赖变更"
+    echo "     ci       — CI/CD 配置变更"
+    echo "     build    — 构建系统或外部依赖变更"
+    echo "     revert   — 回退"
+    echo ""
+    echo "   示例:"
+    echo "     feat(nursing): 新增智能床位报警WebSocket实时推送"
+    echo "     fix(alert): 修复报警沉默周期计算错误"
+    echo "     docs: 更新README部署说明"
+    exit 1
+fi
+
+# ============================================================
+# 4. 禁止以 # 开头的注释行作为提交标题
+# ============================================================
+FIRST_LINE=$(echo "$COMMIT_MSG" | head -1)
+if echo "$FIRST_LINE" | grep -qE '^#'; then
+    echo "❌ 提交信息不能以注释(#)开头, 请删除注释行"
+    exit 1
+fi
+
+# ============================================================
+# 5. 主题行长度限制（≤72字符，GitHub/终端友好）
+# ============================================================
+MAX_SUBJECT_LEN=72
+SUBJECT_LEN=$(echo "$FIRST_LINE" | wc -c)
+if [ $SUBJECT_LEN -gt $MAX_SUBJECT_LEN ]; then
+    echo "⚠️  警告: 主题行过长 (${SUBJECT_LEN} 字符, 建议 ≤ ${MAX_SUBJECT_LEN})"
+    echo "   超出部分在 GitHub 和 git log --oneline 中会被截断"
+fi
+
+exit 0

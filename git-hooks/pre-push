@@ -1,0 +1,52 @@
+#!/bin/bash
+# ============================================================
+# Git Pre-Push Hook — 分支保护 + 推送前检查
+# 安装: cp pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+# ============================================================
+
+# 读取推送信息 (stdin)
+# 格式: <local ref> SP <local sha1> SP <remote ref> SP <remote sha1> LF
+while read local_ref local_sha remote_ref remote_sha; do
+    # ============================================================
+    # 1. 禁止推送到 master / main 分支
+    # ============================================================
+    if echo "$remote_ref" | grep -qE 'refs/heads/(master|main)$'; then
+        echo "❌ 禁止直接推送到 master/main 分支"
+        echo "   请通过 Pull Request / Merge Request 合并"
+        echo "   如需紧急修复，请联系管理员临时放行"
+        echo "   临时绕过: git push --no-verify (慎用)"
+        exit 1
+    fi
+
+    # ============================================================
+    # 2. 分支命名规范校验
+    #    格式: (feature|bugfix|hotfix|release)/[描述]-[工单号]
+    # ============================================================
+    BRANCH=$(echo "$local_ref" | sed 's|refs/heads/||')
+    BRANCH_PATTERN="^(feature|bugfix|hotfix|release)/(.+)$"
+
+    # 允许临时绕过: tag 推送不校验
+    if echo "$local_ref" | grep -q 'refs/tags/'; then
+        continue
+    fi
+
+    if ! echo "$BRANCH" | grep -qE "$BRANCH_PATTERN"; then
+        echo "❌ 分支命名不符合规范: $BRANCH"
+        echo ""
+        echo "   要求格式: type/description"
+        echo ""
+        echo "   支持的 type:"
+        echo "     feature/ — 功能开发分支"
+        echo "     bugfix/  — Bug修复分支"
+        echo "     hotfix/  — 紧急修复分支"
+        echo "     release/ — 发布分支"
+        echo ""
+        echo "   示例:"
+        echo "     feature/smart-bed-alert"
+        echo "     bugfix/alert-silent-period"
+        echo "     hotfix/npe-in-device-controller"
+        exit 1
+    fi
+done
+
+exit 0
