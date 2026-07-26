@@ -53,14 +53,14 @@ spring:
       enabled: false
   datasource:
     driverClassName: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://192.168.100.168:3306/xhzb?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
+    url: jdbc:mysql://localhost:3306/xhzb?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
     username: root
     password: YOUR_PROD_VALUE_HERE
   # redis 配置
   data:
     redis:
       # 地址
-      host: 192.168.100.168
+      host: localhost
       # 端口，默认为6379
       port: 6379
       # 数据库索引
@@ -74,7 +74,7 @@ spring:
           enabled: true
 # Redis-Stack 配置（向量存储）
 redis-stack:
-  host: 192.168.100.168
+  host: localhost
   port: 6378
   password: YOUR_PROD_VALUE_HERE
 # Springdoc配置

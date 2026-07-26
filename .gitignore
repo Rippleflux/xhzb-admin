@@ -58,3 +58,5 @@ application-prod.yml
 CLAUDE.md
 
 需求文档/
+
+docker-compose.yml
