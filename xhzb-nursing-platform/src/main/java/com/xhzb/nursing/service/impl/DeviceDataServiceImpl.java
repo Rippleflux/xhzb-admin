@@ -9,21 +9,19 @@ import cn.hutool.core.bean.copier.CopyOptions;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.LocalDateTimeUtil;
 import cn.hutool.core.util.ObjectUtil;
-import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.xhzb.common.constant.CacheConstants;
-import com.xhzb.common.utils.DateUtils;
 import com.xhzb.nursing.domain.Device;
-import com.xhzb.nursing.domain.vo.device.IotMsgNotifyData;
-import com.xhzb.nursing.mapper.DeviceMapper;
-import com.xhzb.nursing.util.DateTimeZoneConverter;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.stereotype.Service;
-import com.xhzb.nursing.mapper.DeviceDataMapper;
 import com.xhzb.nursing.domain.DeviceData;
+import com.xhzb.nursing.domain.event.DeviceDataEvent;
+import com.xhzb.nursing.domain.vo.device.IotMsgNotifyData;
+import com.xhzb.nursing.mapper.DeviceDataMapper;
+import com.xhzb.nursing.mapper.DeviceMapper;
 import com.xhzb.nursing.service.IDeviceDataService;
+import com.xhzb.nursing.util.DateTimeZoneConverter;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
@@ -44,7 +42,7 @@ public class DeviceDataServiceImpl extends ServiceImpl<DeviceDataMapper, DeviceD
     private DeviceMapper deviceMapper;
 
     @Autowired
-    private RedisTemplate<String, String> redisTemplate;
+    private ApplicationEventPublisher eventPublisher;
 
     /**
      * 查询设备数据表
@@ -140,8 +138,8 @@ public class DeviceDataServiceImpl extends ServiceImpl<DeviceDataMapper, DeviceD
             //key:属性id，value:属性值
             properties.forEach((k, v) -> {
                 CopyOptions copyOptions = CopyOptions.create()
-                        .setIgnoreNullValue(true)                // 忽略 null 值
-                        .setIgnoreProperties("id", "createTime", "updateTime", "remark", "updateBy", "createBy");// 忽略敏
+                        .setIgnoreNullValue(true)
+                        .setIgnoreProperties("id", "createTime", "updateTime", "remark", "updateBy", "createBy");
 
                 DeviceData deviceData = BeanUtil.toBean(device, DeviceData.class, copyOptions);
                 deviceData.setAlarmTime(eventTime);
@@ -150,11 +148,11 @@ public class DeviceDataServiceImpl extends ServiceImpl<DeviceDataMapper, DeviceD
                 deviceData.setAccessLocation(device.getBindingLocation());
                 list.add(deviceData);
             });
-            //批量保存设备数据
+            //批量保存设备数据到 MySQL
             this.saveBatch(list);
-            // 写入Redis缓存：每次上报后覆盖，保证存储最新数据
-            redisTemplate.opsForHash().put(CacheConstants.IOT_DEVICE_LAST_DATA, device.getIotId(), JSONUtil.toJsonStr(list));
-        });
 
+            // 发布事件：由 DataPersistListener 异步写入 Redis + InfluxDB
+            eventPublisher.publishEvent(new DeviceDataEvent(this, list, device));
+        });
     }
 }

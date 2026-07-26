@@ -46,7 +46,8 @@ fi
 # ============================================================
 # 3. 检查是否有调试代码（console.log / System.out.println）
 # ============================================================
-DEBUG_PRINTS=$(git diff --cached --diff-filter=ACM | grep '^+' | grep -E 'System\.out\.print|console\.log|print_r|var_dump|dd\(' | sed 's/^/    /')
+# 注意: \bdd\( 加词边界避免匹配 add( 中的 dd( 子串
+DEBUG_PRINTS=$(git diff --cached --diff-filter=ACM | grep '^+' | grep -E 'System\.out\.print|console\.log|print_r|var_dump|\bdd\(' | sed 's/^/    /')
 if [ -n "$DEBUG_PRINTS" ]; then
     echo "⚠️  警告: 检测到可能残留的调试代码"
     echo "$DEBUG_PRINTS" | head -5
@@ -61,17 +62,19 @@ EXCLUDE_PATTERNS=(
     -e 'get\b'              -e 'set\b'              -e 'import'
     -e '//'                 -e '\*'                 -e '\bTest\b'   -e '\btest\b'
     -e 'YOUR_.*_HERE'       -e '@Value'
-    -e 'private.*String.*password'  -e 'private.*String.*secret'
+    -e 'private.*String.*password'  -e 'private.*String.*secret'  -e 'private.*String.*token'
     -e '`password`'         -e '`secret`'           -e '`token`'
     -e 'username.*password' -e 'client_secret'
     -e '\-example\.yml'
-    -e 'new JedisPooled'
+    -e 'new JedisPooled'    -e 'new JedisCluster'
+    -e 'toCharArray'                                    # InfluxDBClientFactory.create(url, token.toCharArray(), ...)
     -e 'varchar.*密码'      -e 'COMMENT.*秘钥'      -e '设备秘钥'
     -e 'grep -iE'                                       # 排除 hook 自身的匹配规则
 )
+# 使用 grep -iv 做大小写不敏感排除（匹配时 -iE 也是不敏感，排除必须同步）
 SENSITIVE=$(git diff --cached | grep '^+' | grep -v '^+++' \
     | grep -iE 'password|secret|token|api.?key|access.?key' \
-    | grep -v "${EXCLUDE_PATTERNS[@]}" || true)
+    | grep -iv "${EXCLUDE_PATTERNS[@]}" || true)
 if [ -n "$SENSITIVE" ]; then
     echo "❌ 检测到可能的敏感信息泄露:"
     echo "$SENSITIVE" | head -10 | sed 's/^/    /'

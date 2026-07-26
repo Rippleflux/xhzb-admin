@@ -82,7 +82,9 @@ public class AlertRuleController extends BaseController {
     @PostMapping
     @Operation(summary = "新增报警规则")
     public AjaxResult add(@RequestBody AlertRule alertRule) {
-        return toAjax(alertRuleService.insertAlertRule(alertRule));
+        int rows = alertRuleService.insertAlertRule(alertRule);
+        alertRuleService.buildRuleIndex();
+        return toAjax(rows);
     }
 
     /**
@@ -93,7 +95,9 @@ public class AlertRuleController extends BaseController {
     @PutMapping
     @Operation(summary = "修改报警规则")
     public AjaxResult edit(@RequestBody AlertRule alertRule) {
-        return toAjax(alertRuleService.updateAlertRule(alertRule));
+        int rows = alertRuleService.updateAlertRule(alertRule);
+        alertRuleService.buildRuleIndex();
+        return toAjax(rows);
     }
 
     /**
@@ -104,6 +108,8 @@ public class AlertRuleController extends BaseController {
     @DeleteMapping("/{ids}")
     @Operation(summary = "删除报警规则")
     public AjaxResult remove(@Schema(name = "报警规则ID", requiredMode = Schema.RequiredMode.REQUIRED) @PathVariable Long[] ids) {
-        return toAjax(alertRuleService.deleteAlertRuleByIds(ids));
+        int rows = alertRuleService.deleteAlertRuleByIds(ids);
+        alertRuleService.buildRuleIndex();
+        return toAjax(rows);
     }
 }

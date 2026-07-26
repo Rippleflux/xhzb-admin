@@ -217,6 +217,7 @@
         <module>xhzb-generator</module>
         <module>xhzb-common</module>
         <module>xhzb-nursing-platform</module>
+        <module>xhzb-kafka</module>
         <module>xhzb-oss</module>
     </modules>
     <packaging>pom</packaging>

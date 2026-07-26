@@ -8,8 +8,8 @@ import com.xhzb.common.constant.CacheConstants;
 import com.xhzb.nursing.domain.DeviceData;
 import com.xhzb.nursing.domain.Room;
 import com.xhzb.nursing.domain.vo.DeviceInfo;
-import com.xhzb.nursing.mapper.DeviceDataMapper;
 import com.xhzb.nursing.mapper.RoomMapper;
+import com.xhzb.nursing.service.IInfluxDBService;
 import com.xhzb.nursing.service.IRoomService;
 import com.xhzb.nursing.domain.vo.RoomVo;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +36,7 @@ public class RoomServiceImpl extends ServiceImpl<RoomMapper, Room> implements IR
     private RedisTemplate<String, String> redisTemplate;
 
     @Autowired
-    private DeviceDataMapper deviceDataMapper;
+    private IInfluxDBService influxDBService;
 
     /**
      * 查询房间
@@ -167,8 +167,8 @@ public class RoomServiceImpl extends ServiceImpl<RoomMapper, Room> implements IR
                 deviceInfo.setDeviceDataVos(JSONUtil.toList(jsonStr, DeviceData.class));
                 return;
             }
-            // Redis 无缓存，兜底查询 device_data 表
-            List<DeviceData> dbList = deviceDataMapper.selectByIotId(deviceInfo.getIotId());
+            // Redis 无缓存，兜底查询 InfluxDB（解决 selectByIotId 无 LIMIT 问题）
+            List<DeviceData> dbList = influxDBService.queryLatest(deviceInfo.getIotId(), 20);
             if (CollUtil.isNotEmpty(dbList)) {
                 deviceInfo.setDeviceDataVos(dbList);
             }

@@ -34,6 +34,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 报警规则Service业务层处理
@@ -100,189 +101,69 @@ public class AlertRuleServiceImpl extends ServiceImpl<AlertRuleMapper, AlertRule
     }
 
     // ════════════════════════════════════════════════════════════════
-    //  Phase 1: 加载规则
+    //  规则索引构建 + 事件驱动报警处理
     // ════════════════════════════════════════════════════════════════
 
     /**
-     * 报警过滤主入口
+     * 报警过滤入口（保留接口兼容，实际由 AlertDetectionListener 事件驱动）
+     * 该方法仍可被 Quartz 定时调用作为补偿检测
      */
     @Override
     public void alertFilter() {
-        List<AlertRule> rules = loadRules();
-        if (CollUtil.isEmpty(rules)) {
+        // 已迁移至 AlertDetectionListener 事件驱动检测
+        // 保留此方法供 Quartz 补偿检测使用（P5）
+        log.debug("alertFilter called — 实时检测已由 AlertDetectionListener 接管");
+    }
+
+    /**
+     * 构建规则索引 — 规则变更时调用
+     * 将启用规则加载到 Redis：规则缓存 Hash + 规则索引 Set
+     */
+    @Override
+    public void buildRuleIndex() {
+        List<AlertRule> rules = alertRuleMapper.selectEnabledRules();
+        if (CollUtil.isEmpty(rules)) return;
+
+        // 清除旧索引
+        redisTemplate.delete(CacheConstants.IOT_RULE_INDEX_PREFIX + "*");
+
+        for (AlertRule rule : rules) {
+            String ruleId = String.valueOf(rule.getId());
+
+            // ① 规则详情缓存 (Hash)
+            String cacheKey = CacheConstants.IOT_RULE_CACHE_PREFIX + ruleId;
+            redisTemplate.opsForHash().put(cacheKey, "operator", nvl(rule.getOperator()));
+            redisTemplate.opsForHash().put(cacheKey, "value", String.valueOf(rule.getValue()));
+            redisTemplate.opsForHash().put(cacheKey, "duration", String.valueOf(rule.getDuration()));
+            redisTemplate.opsForHash().put(cacheKey, "alertSilentPeriod", String.valueOf(rule.getAlertSilentPeriod()));
+            redisTemplate.opsForHash().put(cacheKey, "alertEffectivePeriod", nvl(rule.getAlertEffectivePeriod()));
+            redisTemplate.opsForHash().put(cacheKey, "alertDataType", String.valueOf(rule.getAlertDataType()));
+            redisTemplate.opsForHash().put(cacheKey, "productKey", nvl(rule.getProductKey()));
+            redisTemplate.opsForHash().put(cacheKey, "productName", nvl(rule.getProductName()));
+            redisTemplate.opsForHash().put(cacheKey, "functionName", nvl(rule.getFunctionName()));
+
+            // ② 规则索引 (Set): functionId → ruleIds
+            if (StrUtil.isNotBlank(rule.getFunctionId())) {
+                redisTemplate.opsForSet().add(
+                        CacheConstants.IOT_RULE_INDEX_PREFIX + rule.getFunctionId(), ruleId);
+            }
+        }
+        log.info("规则索引构建完成, 启用规则数={}", rules.size());
+    }
+
+    /**
+     * 处理报警触发 — 由 AlertDetectionListener 通过 Pub/Sub 调用
+     * 负责通知人查找 + 报警入库 + WebSocket 推送
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void handleAlertTrigger(Long ruleId, DeviceData deviceData) {
+        AlertRule rule = getById(ruleId);
+        if (rule == null) {
+            log.warn("规则不存在 ruleId={}", ruleId);
             return;
         }
-        List<DeviceData> deviceDatas = loadDeviceData();
-        if (CollUtil.isEmpty(deviceDatas)) {
-            return;
-        }
-        for (DeviceData deviceData : deviceDatas) {
-            evaluateRule(rules, deviceData);
-        }
-    }
-
-    /**
-     * 加载所有启用的报警规则
-     */
-    private List<AlertRule> loadRules() {
-        return alertRuleMapper.selectEnabledRules();
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    //  Phase 2: 加载设备数据
-    // ════════════════════════════════════════════════════════════════
-
-    /**
-     * 从Redis拉取所有设备最新上报数据
-     */
-    private List<DeviceData> loadDeviceData() {
-        Map<Object, Object> entries = redisTemplate.opsForHash()
-                .entries(CacheConstants.IOT_DEVICE_LAST_DATA);
-        if (CollUtil.isEmpty(entries)) {
-            return new ArrayList<>();
-        }
-        List<DeviceData> result = new ArrayList<>();
-        for (Object value : entries.values()) {
-            String jsonStr = (String) value;
-            if (StrUtil.isEmpty(jsonStr)) {
-                continue;
-            }
-            try {
-                result.addAll(JSONUtil.toList(jsonStr, DeviceData.class));
-            } catch (Exception e) {
-                log.warn("设备数据JSON解析失败: {}", jsonStr, e);
-            }
-        }
-        return result;
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    //  Phase 3: 规则比对
-    // ════════════════════════════════════════════════════════════════
-
-    /**
-     * 逐条数据匹配规则
-     */
-    private void evaluateRule(List<AlertRule> rules, DeviceData deviceData) {
-        // 过滤：上报时间超过1分钟视为历史数据
-        LocalDateTime alarmTime = deviceData.getAlarmTime();
-        if (alarmTime != null
-                && LocalDateTimeUtil.between(alarmTime, LocalDateTime.now(), ChronoUnit.SECONDS) > 60) {
-            return;
-        }
-
-        // 找出所有匹配的规则
-        List<AlertRule> matched = rules.stream()
-                .filter(r -> ObjectUtil.equal(r.getProductKey(), deviceData.getProductKey())
-                        && ObjectUtil.equal(r.getFunctionId(), deviceData.getFunctionId()))
-                .collect(Collectors.toList());
-        if (CollUtil.isEmpty(matched)) {
-            return;
-        }
-
-        for (AlertRule rule : matched) {
-            // ① 生效时间判断
-            if (!isInEffectivePeriod(rule)) {
-                clearTriggerCount(deviceData.getIotId(), rule.getId());
-                continue;
-            }
-
-            // ② 阈值判断
-            if (!isThresholdExceeded(rule, deviceData)) {
-                clearTriggerCount(deviceData.getIotId(), rule.getId());
-                continue;
-            }
-
-            // ③ 沉默周期检查
-            if (isInSilentPeriod(deviceData.getIotId(), rule.getId())) {
-                continue;
-            }
-
-            // ④⑤ 异常次数累计 + 持续周期判定
-            int count = incrTriggerCount(deviceData.getIotId(), rule.getId());
-            if (count >= rule.getDuration()) {
-                // 触发报警
-                clearTriggerCount(deviceData.getIotId(), rule.getId());
-                setSilentPeriod(deviceData.getIotId(), rule.getId(), rule.getAlertSilentPeriod());
-                resolveNotifier(rule, deviceData);
-            }
-        }
-    }
-
-    /**
-     * 判断当前时间是否在规则的生效时段内
-     * 格式: 00:00:00~23:59:59
-     */
-    private boolean isInEffectivePeriod(AlertRule rule) {
-        String period = rule.getAlertEffectivePeriod();
-        if (StrUtil.isEmpty(period)) {
-            return true;
-        }
-        try {
-            String[] parts = period.split("~");
-            LocalTime start = LocalTime.parse(parts[0]);
-            LocalTime end = LocalTime.parse(parts[1]);
-            LocalTime now = LocalTime.now();
-            if (start.isBefore(end) || start.equals(end)) {
-                return !now.isBefore(start) && !now.isAfter(end);
-            } else {
-                // 跨夜时段（如 22:00:00~06:00:00）
-                return !now.isBefore(start) || !now.isAfter(end);
-            }
-        } catch (Exception e) {
-            log.warn("解析生效时段失败: {} -> {}", rule.getId(), period, e);
-            return true; // 解析失败默认全部时段生效
-        }
-    }
-
-    /**
-     * 判断设备数据是否达到规则阈值
-     */
-    private boolean isThresholdExceeded(AlertRule rule, DeviceData deviceData) {
-        String dataValue = deviceData.getDataValue();
-        if (StrUtil.isEmpty(dataValue)) {
-            return false;
-        }
-        try {
-            double val = Double.parseDouble(dataValue);
-            double threshold = rule.getValue();
-            String op = rule.getOperator();
-            if (">".equals(op)) return val > threshold;
-            if ("<".equals(op)) return val < threshold;
-            if (">=".equals(op)) return val >= threshold;
-            if ("<=".equals(op)) return val <= threshold;
-            if ("==".equals(op)) return val == threshold;
-            return false;
-        } catch (NumberFormatException e) {
-            log.debug("数据值无法转换为数字: {} -> {}", deviceData.getIotId(), dataValue);
-            return false;
-        }
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    //  Redis 辅助方法
-    // ════════════════════════════════════════════════════════════════
-
-    private boolean isInSilentPeriod(String iotId, Long ruleId) {
-        String key = CacheConstants.ALERT_SILENT_PREFIX + iotId + ":" + ruleId;
-        String val = redisTemplate.opsForValue().get(key);
-        return StrUtil.isNotEmpty(val);
-    }
-
-    private int incrTriggerCount(String iotId, Long ruleId) {
-        String key = CacheConstants.ALERT_TRIGGER_COUNT_PREFIX + iotId + ":" + ruleId;
-        Long count = redisTemplate.opsForValue().increment(key);
-        return count != null ? count.intValue() : 1;
-    }
-
-    private void clearTriggerCount(String iotId, Long ruleId) {
-        String key = CacheConstants.ALERT_TRIGGER_COUNT_PREFIX + iotId + ":" + ruleId;
-        redisTemplate.delete(key);
-    }
-
-    private void setSilentPeriod(String iotId, Long ruleId, int silentMinutes) {
-        String key = CacheConstants.ALERT_SILENT_PREFIX + iotId + ":" + ruleId;
-        redisTemplate.opsForValue().set(key, "1", silentMinutes, TimeUnit.MINUTES);
+        resolveNotifier(rule, deviceData);
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -386,6 +267,11 @@ public class AlertRuleServiceImpl extends ServiceImpl<AlertRuleMapper, AlertRule
 
             alertList.add(alertData);
         }
+        // 记录推送用户ID到remark字段
+        String userIdsStr = userIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+        String remark = "推送用户ID: " + userIdsStr;
+        alertList.forEach(ad -> ad.setRemark(remark));
+
         alertDataService.saveBatch(alertList);
         log.info("报警数据已保存 ruleId={} iotId={} 通知人数={}", rule.getId(), deviceData.getIotId(), userIds.size());
 
@@ -406,4 +292,6 @@ public class AlertRuleServiceImpl extends ServiceImpl<AlertRuleMapper, AlertRule
                 .build();
         webSocketServer.sendMessageToConsumer(notifyVo, userIds);
     }
+
+    private String nvl(String s) { return s != null ? s : ""; }
 }

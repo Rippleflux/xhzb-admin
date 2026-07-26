@@ -2,6 +2,7 @@ package com.xhzb.nursing.service;
 
 import java.util.List;
 import com.xhzb.nursing.domain.AlertRule;
+import com.xhzb.nursing.domain.DeviceData;
 import com.baomidou.mybatisplus.extension.service.IService;
 
 /**
@@ -64,4 +65,19 @@ public interface IAlertRuleService extends IService<AlertRule>
      * 报警过滤：定时拉取设备数据，匹配启用规则，触发生成报警数据
      */
     void alertFilter();
+
+    /**
+     * 处理报警触发 — 由 Redis Pub/Sub 订阅者调用
+     * 负责通知人查找 + 报警入库 + WebSocket 推送
+     *
+     * @param ruleId     报警规则 ID
+     * @param deviceData 触发报警的设备数据
+     */
+    void handleAlertTrigger(Long ruleId, DeviceData deviceData);
+
+    /**
+     * 构建规则索引 — 将启用规则加载到 Redis
+     * 应在应用启动 + 规则增删改后调用
+     */
+    void buildRuleIndex();
 }
