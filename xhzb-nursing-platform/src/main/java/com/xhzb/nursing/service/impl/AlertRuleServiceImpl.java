@@ -236,48 +236,43 @@ public class AlertRuleServiceImpl extends ServiceImpl<AlertRuleMapper, AlertRule
     // ════════════════════════════════════════════════════════════════
 
     /**
-     * 批量保存报警数据，每个通知人一条
+     * 保存报警数据 — 合并为一条，推送用户ID列表记录到 remark
      */
     private void saveAlert(AlertRule rule, DeviceData deviceData, List<Long> userIds) {
-        List<AlertData> alertList = new ArrayList<>();
-        for (Long userId : userIds) {
-            AlertData alertData = new AlertData();
-            alertData.setIotId(deviceData.getIotId());
-            alertData.setDeviceName(deviceData.getDeviceName());
-            alertData.setProductKey(deviceData.getProductKey());
-            alertData.setProductName(deviceData.getProductName());
-            alertData.setFunctionId(deviceData.getFunctionId());
-            alertData.setAccessLocation(deviceData.getAccessLocation());
-            alertData.setLocationType(deviceData.getLocationType());
-            alertData.setPhysicalLocationType(deviceData.getPhysicalLocationType());
-            alertData.setDeviceDescription(deviceData.getDeviceDescription());
-            alertData.setDataValue(deviceData.getDataValue());
-            alertData.setAlertRuleId(rule.getId().intValue());
-            alertData.setType(rule.getAlertDataType());
-            alertData.setStatus(0); // 待处理
-            alertData.setUserId(userId);
+        AlertData alertData = new AlertData();
+        alertData.setIotId(deviceData.getIotId());
+        alertData.setDeviceName(deviceData.getDeviceName());
+        alertData.setProductKey(deviceData.getProductKey());
+        alertData.setProductName(deviceData.getProductName());
+        alertData.setFunctionId(deviceData.getFunctionId());
+        alertData.setAccessLocation(deviceData.getAccessLocation());
+        alertData.setLocationType(deviceData.getLocationType());
+        alertData.setPhysicalLocationType(deviceData.getPhysicalLocationType());
+        alertData.setDeviceDescription(deviceData.getDeviceDescription());
+        alertData.setDataValue(deviceData.getDataValue());
+        alertData.setAlertRuleId(rule.getId().intValue());
+        alertData.setType(rule.getAlertDataType());
+        alertData.setStatus(0); // 待处理
+        alertData.setUserId(userIds.get(0)); // 主通知人
 
-            // 报警原因：功能名称+运算符+阈值,持续N个周期就报警
-            String reason = String.format("%s%s%s,持续%d个周期就报警",
-                    rule.getFunctionName(),
-                    rule.getOperator(),
-                    rule.getValue(),
-                    rule.getDuration());
-            alertData.setAlertReason(reason);
+        // 报警原因
+        String reason = String.format("%s%s%s,持续%d个周期就报警",
+                rule.getFunctionName(),
+                rule.getOperator(),
+                rule.getValue(),
+                rule.getDuration());
+        alertData.setAlertReason(reason);
 
-            alertList.add(alertData);
-        }
-        // 记录推送用户ID到remark字段
+        // 推送用户ID列表记入 remark
         String userIdsStr = userIds.stream().map(String::valueOf).collect(Collectors.joining(","));
-        String remark = "推送用户ID: " + userIdsStr;
-        alertList.forEach(ad -> ad.setRemark(remark));
+        alertData.setRemark("推送用户ID: " + userIdsStr);
 
-        alertDataService.saveBatch(alertList);
+        alertDataService.save(alertData);
         log.info("报警数据已保存 ruleId={} iotId={} 通知人数={}", rule.getId(), deviceData.getIotId(), userIds.size());
 
         // 构建WebSocket推送消息
         AlertNotifyVo notifyVo = AlertNotifyVo.builder()
-                .id(alertList.get(0).getId())
+                .id(alertData.getId())
                 .accessLocation(deviceData.getAccessLocation())
                 .locationType(deviceData.getLocationType())
                 .physicalLocationType(deviceData.getPhysicalLocationType())
@@ -289,6 +284,7 @@ public class AlertRuleServiceImpl extends ServiceImpl<AlertRuleMapper, AlertRule
                 .voiceNotifyStatus(1)
                 .notifyType(1)
                 .isAllConsumer(false)
+                .userIds(userIdsStr)
                 .build();
         webSocketServer.sendMessageToConsumer(notifyVo, userIds);
     }

@@ -74,4 +74,9 @@ public class AlertNotifyVo {
      * 智能床位的报警消息是全员通知，对于护理员和固定设备维护人员不是全员通知
      */
     private Boolean isAllConsumer;
+
+    /**
+     * 目标用户ID列表
+     */
+    private String userIds;
 }

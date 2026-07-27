@@ -1,7 +1,7 @@
 package com.xhzb.kafka.consumer;
 
 import cn.hutool.json.JSONUtil;
-import com.xhzb.kafka.message.DeviceDataMessage;
+import com.xhzb.common.message.DeviceDataMessage;
 import com.xhzb.nursing.service.IInfluxDBService;
 import com.xhzb.nursing.domain.DeviceData;
 import lombok.extern.slf4j.Slf4j;

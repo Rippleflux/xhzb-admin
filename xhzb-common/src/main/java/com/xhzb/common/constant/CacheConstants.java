@@ -50,8 +50,16 @@ public class CacheConstants
 
     /**
      * IoT设备最新上报数据缓存 key（Hash结构：field=iotId, value=设备数据JSON）
+     * @deprecated 2.1 迁移至设备维度 Key: iot:{deviceId}:state (Hash)
      */
+    @Deprecated
     public static final String IOT_DEVICE_LAST_DATA = "iot:device_last_data";
+
+    /**
+     * 设备实时状态缓存前缀（Hash结构，设备维度）
+     * Key: iot:{deviceId}:state
+     */
+    public static final String IOT_DEVICE_STATE_PREFIX = "iot:";
 
     /**
      * 报警规则连续触发次数缓存前缀

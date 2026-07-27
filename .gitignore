@@ -60,3 +60,5 @@ CLAUDE.md
 需求文档/
 
 docker-compose.yml
+docker-compose.export.yml
+.codegraph/

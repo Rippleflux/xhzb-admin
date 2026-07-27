@@ -1,7 +1,7 @@
-package com.xhzb.kafka.service;
+package com.xhzb.nursing.service;
 
 import cn.hutool.json.JSONUtil;
-import com.xhzb.kafka.message.DeviceDataMessage;
+import com.xhzb.common.message.DeviceDataMessage;
 import com.xhzb.nursing.domain.DeviceData;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +14,9 @@ import java.util.stream.Collectors;
 
 /**
  * 设备数据网关 — DeviceData → Kafka Message → device-data-topic
+ * <p>
+ * 2.1: 从 xhzb-kafka 模块迁入 xhzb-nursing-platform，解决循环依赖。
+ * xhzb-kafka 模块现在仅包含纯 Kafka 消费者和配置。
  *
  * @author rippleflux
  * @date 2026-07-26

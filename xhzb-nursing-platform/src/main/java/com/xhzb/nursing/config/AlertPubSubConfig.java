@@ -1,35 +1,13 @@
 package com.xhzb.nursing.config;
 
-import com.xhzb.nursing.listener.AlertTriggerSubscriber;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.listener.ChannelTopic;
-import org.springframework.data.redis.listener.RedisMessageListenerContainer;
-
 /**
- * Redis Pub/Sub 报警消息配置
- * <p>
- * 注册 alert:trigger:channel 的订阅者，实现 AlertDetectionListener
- * → Redis Pub/Sub → AlertTriggerSubscriber → handleAlertTrigger 的解耦链路。
+ * 2.1 已停用 — Redis Pub/Sub 由 Kafka alert-topic 替代
  *
  * @author rippleflux
  * @date 2026-07-26
+ * @deprecated 2.1 停用
  */
-@Configuration
+@Deprecated
 public class AlertPubSubConfig {
-
-    @Autowired
-    private AlertTriggerSubscriber alertTriggerSubscriber;
-
-    @Bean
-    public RedisMessageListenerContainer alertTriggerContainer(
-            RedisConnectionFactory connectionFactory) {
-        RedisMessageListenerContainer container = new RedisMessageListenerContainer();
-        container.setConnectionFactory(connectionFactory);
-        container.addMessageListener(alertTriggerSubscriber,
-                new ChannelTopic("alert:trigger:channel"));
-        return container;
-    }
+    // 2.1: Redis Pub/Sub 由 Kafka Topic 替代
 }

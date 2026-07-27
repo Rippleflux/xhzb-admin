@@ -190,3 +190,26 @@ public class BedServiceImpl
 1. **禁止在 Controller 写业务逻辑或拼 SQL** — Controller 只做参数接收→调用 Service→包装返回，一切逻辑下沉到 ServiceImpl
 2. **禁止硬编码常量** — 缓存 key 放 `CacheConstants`，业务常量放 `SystemConstants`，配置放 `application.yml`
 3. **禁止返回裸 `List` 或 `String`** — 必须用 `R<T>` / `AjaxResult` / `TableDataInfo` 统一包装，走框架的 `BaseController.success()` / `R.ok()` 方法
+
+## 代码探索工作流
+
+> 已安装 codegraph MCP（537 文件 / 12k 节点索引），项目在 WSL2 `/mnt/` 下不支持实时监控，重要修改后需 `codegraph sync` 手动刷新。
+
+### 工具选择矩阵
+
+| 场景 | 首选 | 备选 | 说明 |
+|------|------|------|------|
+| 探索子系统 / 理解模块 | `codegraph_explore` | grep+Read | 1 次调用出调用链+源码，省 4-6 轮 |
+| 找唯一命名方法的调用者 | `codegraph_callers` | — | Java Spring Bean 命名唯一，可信 |
+| 重构前查全量调用者 | codegraph 预排 → **grep 确认** | — | codegraph 有假阴性，grep 是唯一真源 |
+| 重载名称（execute/run/new） | **grep** | codegraph_node(id) | codegraph 模糊匹配不靠谱 |
+| 刚编辑完的代码 | **grep** | `codegraph sync` 后 | 索引落后磁盘 ~1s |
+| 跨模块数据流追踪 | `codegraph_explore` | grep × N | 夸模块遍历是 codegraph 强项 |
+
+### 性能对比
+
+| 典型操作 | 旧方案 | 新方案 | 提速 |
+|---------|--------|--------|------|
+| "X 在哪里定义/使用" | grep(1) + Read(3-5) = 4-6 轮 | `explore`(1 轮) | **4-6x** |
+| "改 Y 会影响哪些" | grep(1) + Read(5-10) = 6-11 轮 | `impact` 预排 → grep 确认(2 轮) | **3-5x** |
+| "从 A 到 B 的调用链" | Read × 逐层追踪 (N 轮) | `explore`(1 轮) | **N 倍** |

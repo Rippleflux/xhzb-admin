@@ -9,12 +9,14 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.*;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Kafka Producer + Consumer 配置
+ * Kafka Producer + Consumer 配置（2.1 升级：分级重试）
  *
  * @author rippleflux
  * @date 2026-07-26
@@ -71,6 +73,18 @@ public class KafkaConfig {
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory());
         factory.setConcurrency(3);
+
+        // 2.1: 分级重试 — 3 次重试（间隔 1s），耗尽后发 dead-letter-topic
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(
+                (record, exception) -> {
+                    // 死信 — 发送到 dead-letter-topic 供人工排查
+                    KafkaTemplate<String, String> dlqTemplate = kafkaTemplate();
+                    dlqTemplate.send("dead-letter-topic", (String) record.key(), (String) record.value());
+                },
+                new FixedBackOff(1000L, 3)  // 1s 间隔，最多 3 次重试
+        );
+        factory.setCommonErrorHandler(errorHandler);
+
         return factory;
     }
 }

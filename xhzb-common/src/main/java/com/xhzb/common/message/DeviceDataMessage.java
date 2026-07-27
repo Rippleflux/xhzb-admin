@@ -1,4 +1,4 @@
-package com.xhzb.kafka.message;
+package com.xhzb.common.message;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Kafka 设备数据消息体
+ * Kafka 设备数据消息体（跨模块共享）
  *
  * @author rippleflux
  * @date 2026-07-26

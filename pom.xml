@@ -173,6 +173,13 @@
                 <version>${xhzb.version}</version>
             </dependency>
 
+            <!-- Kafka消息管道 -->
+            <dependency>
+                <groupId>com.xhzb</groupId>
+                <artifactId>xhzb-kafka</artifactId>
+                <version>${xhzb.version}</version>
+            </dependency>
+
             <!-- 护理平台-->
             <dependency>
                 <groupId>com.xhzb</groupId>

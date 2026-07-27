@@ -10,9 +10,9 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.LocalDateTimeUtil;
 import cn.hutool.core.util.ObjectUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.xhzb.nursing.service.DeviceGatewayService;
 import com.xhzb.nursing.domain.Device;
 import com.xhzb.nursing.domain.DeviceData;
-import com.xhzb.nursing.domain.event.DeviceDataEvent;
 import com.xhzb.nursing.domain.vo.device.IotMsgNotifyData;
 import com.xhzb.nursing.mapper.DeviceDataMapper;
 import com.xhzb.nursing.mapper.DeviceMapper;
@@ -20,13 +20,11 @@ import com.xhzb.nursing.service.IDeviceDataService;
 import com.xhzb.nursing.util.DateTimeZoneConverter;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
-
 /**
  * 设备数据表Service业务层处理
  *
@@ -42,7 +40,7 @@ public class DeviceDataServiceImpl extends ServiceImpl<DeviceDataMapper, DeviceD
     private DeviceMapper deviceMapper;
 
     @Autowired
-    private ApplicationEventPublisher eventPublisher;
+    private DeviceGatewayService deviceGatewayService;
 
     /**
      * 查询设备数据表
@@ -111,7 +109,6 @@ public class DeviceDataServiceImpl extends ServiceImpl<DeviceDataMapper, DeviceD
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void batchInsertDeviceData(IotMsgNotifyData iotMsgNotifyData) {
         String iotId = iotMsgNotifyData.getHeader().getDeviceId();
         //查询设备信息
@@ -120,7 +117,7 @@ public class DeviceDataServiceImpl extends ServiceImpl<DeviceDataMapper, DeviceD
             log.error("设备不存在");
             return;
         }
-        //批量保存设备数据
+        //批量发送设备数据到 Kafka
         iotMsgNotifyData.getBody().getServices().forEach(s -> {
             //判断属性是否为空
             Map<String, Object> properties = s.getProperties();
@@ -148,11 +145,8 @@ public class DeviceDataServiceImpl extends ServiceImpl<DeviceDataMapper, DeviceD
                 deviceData.setAccessLocation(device.getBindingLocation());
                 list.add(deviceData);
             });
-            //批量保存设备数据到 MySQL
-            this.saveBatch(list);
-
-            // 发布事件：由 DataPersistListener 异步写入 Redis + InfluxDB
-            eventPublisher.publishEvent(new DeviceDataEvent(this, list, device));
+            // Kafka 作为唯一数据入口：发布到 device-data-topic
+            deviceGatewayService.send(list);
         });
     }
 }

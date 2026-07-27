@@ -55,6 +55,11 @@
             <artifactId>xhzb-nursing-platform</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>com.xhzb</groupId>
+            <artifactId>xhzb-kafka</artifactId>
+        </dependency>
+
 <!--        <dependency>-->
 <!--            <groupId>net.logstash.logback</groupId>-->
 <!--            <artifactId>logstash-logback-encoder</artifactId>-->
