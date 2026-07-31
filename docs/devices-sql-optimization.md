@@ -46,7 +46,7 @@ SQL A: selectDeviceDataList (动态筛选)
 - 建议索引（依据 query patterns）:
   - 如果常见查询带有 function_id 和 product_key：
     CREATE INDEX idx_device_func_prod_alarm ON device_data (function_id, product_key, alarm_time DESC);
-  - 如果常见查询以 iot_id 为主键过滤（常见于按设备查看历史）：
+  - 如果常��查询以 iot_id 为主键过滤（常见于按设备查看历史）：
     CREATE INDEX idx_device_iot_alarm ON device_data (iot_id, alarm_time DESC);
   - 单列索引（补充）：
     CREATE INDEX idx_device_product_key ON device_data (product_key);
@@ -157,5 +157,48 @@ ALTER TABLE device DROP INDEX ux_device_iot;
 下一步（我将做的）
 - 我已把 DeviceData 的逐 SQL 分析追加到本 Markdown 文档；如果你需要，我可以把该文件放到仓库（docs/ 或 sql/ 目录）作为变更建议的可审阅文档。
 - 如需我把上述 ALTER 语句打包为 SQL 补丁文件或生成 PR，我可以继续（请回复“生成 SQL 补丁”或“生成 PR”）。
-- 如果你愿意把测试库的 SHOW CREATE TABLE（device_data / alert_data / alert_rule / device）和 1-3 条慢查询 EXPLAIN 返回，我会基于实际 DDL 给出最优联合索引列顺序并微调建议。
+- 如果你愿意把测试库的 SHOW CREATE TABLE（device_data / alert_data / alert_rule / device）和 1-3 条慢查询 EXPLAIN 返回，我会基于实际 DDL 给出最优联合索引列顺序与最终建议。
+
+
+------------------------------------------------------------------------
+
+Bed — Mapper & SQL 建议（来自 xhzb-nursing-platform/src/main/resources/mapper/nursing/BedMapper.xml）
+
+表与关键字段（来自 sql/xhzb.sql 的 DDL）：
+- 表名：bed
+- 关键列：id (PK), bed_number (UNIQUE), bed_status, sort, room_id, create_time
+
+Mapper 概览
+- selectBedList 支持按 bed_number (exact), bed_status, sort, room_id 过滤
+- selectBedById 使用主键 id
+- insert/update/delete 标准 CRUD
+
+常见性能分析与建议
+- bed_number 已有 UNIQUE 索引，等值查询（bed_number = ?）已经被优化；无需额外索引
+- 对于按房间查询（room_id）或按状态筛选（bed_status）场景，建议添加索引：
+  - 如果查询经常单独按 room_id：
+    ALTER TABLE bed ADD INDEX idx_bed_room (room_id);
+  - 如果查询通常按 room_id + bed_status 或需要按 sort 排序（例如房间内按床位号排序）：
+    ALTER TABLE bed ADD INDEX idx_bed_room_status_sort (room_id, bed_status, sort);
+  - 若仅按 bed_status 统计或查询（少数场景），可单独添加 idx_bed_status (bed_status)
+- 因为 bed 表通常较小（床位数量有限），索引收益相对有限，但加入针对性索引仍然能优化在房间维度的过滤与分页
+
+MyBatis 层面
+- selectBedList 的等值过滤已经适合索引化；保留现有动态 <if> 逻辑即可
+- 对于分页（若有），建议使用 keyset pagination 或在 WHERE 中加上 room_id 优先过滤来减少扫描
+
+建议 DDL（测试先执行）
+ALTER TABLE bed ADD INDEX idx_bed_room (room_id);
+ALTER TABLE bed ADD INDEX idx_bed_room_status_sort (room_id, bed_status, sort);
+-- 可选
+ALTER TABLE bed ADD INDEX idx_bed_status (bed_status);
+
+回滚示例
+ALTER TABLE bed DROP INDEX idx_bed_room;
+ALTER TABLE bed DROP INDEX idx_bed_room_status_sort;
+ALTER TABLE bed DROP INDEX idx_bed_status;
+
+上线注意
+- bed 表一般写入频率低，添加上述索引对写入影响小
+- 在生产执行前，在测试库运行 EXPLAIN 并验证查询路径
 
