@@ -1,101 +1,105 @@
 
 
-## FamilyMemberElderMapper — 分析
+## HealthAssessmentMapper — 分析
 
-文件: xhzb-nursing-platform/src/main/resources/mapper/nursing/FamilyMemberElderMapper.xml
-
-关键 SQL:
-- selectFamilyMemberElderList: where family_member_id = ? or elder_id = ?
-- getMyFamilyList: 多表左关联（family_member_elder -> elder -> bed -> room -> device）按 family_member_elder.family_member_id 过滤
-
-问题点与建议:
-- family_member_id 与 elder_id 是高频等值查找字段，建议单列索引（如果不存在）或联合索引（取决于查询组合）
-- getMyFamilyList 执行多表 LEFT JOIN，关键在于连接字段上存在索引：family_member_elder.elder_id, elder.id, bed.bed_number (用于 join)、bed.room_id, room.id, device.binding_location + device.location_type
-- device.join 条件使用 device.binding_location = elder.id AND device.location_type = 0，如果 binding_location 没有索引或组合索引(device.binding_location, device.location_type) 则会导致 device 表全表扫描
-
-建议DDL:
-ALTER TABLE family_member_elder ADD INDEX idx_fme_family (family_member_id);
-ALTER TABLE family_member_elder ADD INDEX idx_fme_elder (elder_id);
--- 对 device join 建议组合索引
-ALTER TABLE device ADD INDEX idx_device_binding_loc_type (binding_location, location_type);
-
-回滚:
-ALTER TABLE family_member_elder DROP INDEX idx_fme_family;
-ALTER TABLE family_member_elder DROP_INDEX idx_fme_elder;
-ALTER TABLE device DROP INDEX idx_device_binding_loc_type;
-
-验证:
-- EXPLAIN on getMyFamilyList（检查 join order 与 key 使用）
-- 期望：family_member_elder 使用 idx_fme_family，elder 使用 PRIMARY key, bed 使用 idx_bed_bed_number（或 bed_number 的索引），device 使用 idx_device_binding_loc_type
-
-
-## FamilyMemberMapper — 分析
-
-文件: xhzb-nursing-platform/src/main/resources/mapper/nursing/FamilyMemberMapper.xml
+文件: xhzb-nursing-platform/src/main/resources/mapper/nursing/HealthAssessmentMapper.xml
 
 关键 SQL:
-- selectFamilyMemberList: phone = ?, name LIKE '%'
+- selectHealthAssessmentList: elder_name LIKE '%', id_card = ?, elder_id = ?, core_suggestion = ?, check_in_status, evaluation_progress
 
 问题点与建议:
-- phone 等值查找应有索引（加速找回用户）
-- name 使用 leading-wildcard LIKE 无法走普通索引；若常按 name 搜索，建议全文或前缀搜索
+- elder_name 使用 leading-wildcard LIKE，建议改为前缀或 FULLTEXT，如果频繁按 elder_id、id_card 查询请加索引
+- 建议为 id_card、elder_id、check_in_status 建索引
 
 建议DDL:
-ALTER TABLE family_member ADD INDEX idx_family_phone (phone);
+ALTER TABLE health_assessment ADD INDEX idx_ha_idcard (id_card);
+ALTER TABLE health_assessment ADD INDEX idx_ha_elder (elder_id);
+ALTER TABLE health_assessment ADD INDEX idx_ha_checkin_status (check_in_status);
 
 回滚:
-ALTER TABLE family_member DROP INDEX idx_family_phone;
+ALTER TABLE health_assessment DROP INDEX idx_ha_idcard;
+ALTER TABLE health_assessment DROP INDEX idx_ha_elder;
+ALTER TABLE health_assessment DROP INDEX idx_ha_checkin_status;
 
 验证:
-- EXPLAIN SELECT ... WHERE phone = ?
+- EXPLAIN SELECT ... WHERE id_card = ?; EXPLAIN SELECT ... WHERE elder_id = ?
 
 
-## FloorMapper — 分析
+## HealthAssessmentReportMapper — 分析（摘要）
 
-文件: xhzb-nursing-platform/src/main/resources/mapper/nursing/FloorMapper.xml
+文件: xhzb-nursing-platform/src/main/resources/mapper/nursing/HealthAssessmentReportMapper.xml
 
 关键 SQL:
-- selectFloorList: name LIKE '%', code = ?
-- selectAllByNur: 多表 LEFT JOIN (floor->room->bed->elder) WHERE b.bed_status = 1 GROUP BY f.id ORDER BY code, create_time DESC
-- getRoomAndBedByBedStatus: 从 floor,room,bed where f.id = r.floor_id and r.id = b.room_id and b.bed_status = #{status}
-- getAllFloorsWithDevice: 使用 EXISTS 联合 device 与 room/bed
+- selectHealthAssessmentReportList: 多字段动态等值与少量 LIKE
 
 问题点与建议:
-- getAllFloorsWithDevice 的 EXISTS 子查询里有 JOINs 与条件 d.binding_location = r.id AND d.location_type = 1 AND d.physical_location_type = 1，建议对 device 建组合索引 (binding_location, location_type, physical_location_type)
-- getRoomAndBedByBedStatus JOIN 链上 bed.room_id 与 room.id、room.floor_id 与 floor.id 应被索引（通常主键/外键自带索引）
-- selectAllByNur 使用 GROUP BY f.id 与 ORDER BY code, create_time DESC：确保 f.code 与 f.create_time 有索引覆盖（例如索引 f.code 或联合索引 (code, create_time DESC)）可在排序时帮助
+- 表字段很多，重点索引应聚焦在高频等值查找字段：health_assessment_id、assessment_time、check_in_status
+- 建议为 health_assessment_id 建索引，必要时为 assessment_time 建索引以支持时间范围查询
 
 建议DDL:
-ALTER TABLE device ADD INDEX idx_device_binding_loc_type_phys (binding_location, location_type, physical_location_type);
-ALTER TABLE floor ADD INDEX idx_floor_code_create (code, create_time DESC);
+ALTER TABLE health_assessment_report ADD INDEX idx_har_assessment (health_assessment_id);
+ALTER TABLE health_assessment_report ADD INDEX idx_har_time (assessment_time);
 
 回滚:
-ALTER TABLE device DROP INDEX idx_device_binding_loc_type_phys;
-ALTER TABLE floor DROP INDEX idx_floor_code_create;
+ALTER TABLE health_assessment_report DROP INDEX idx_har_assessment;
+ALTER TABLE health_assessment_report DROP INDEX idx_har_time;
 
 验证:
-- EXPLAIN on getAllFloorsWithDevice（期望 EXISTS 子查询使用 device 的组合索引）
-- EXPLAIN on getRoomAndBedByBedStatus（检查 join keys）
+- EXPLAIN on representative queries
 
 
-## HealthAssessmentDataCollectionMapper — 分析
+## KnowledgeBaseMapper — 分析
 
-文件: xhzb-nursing-platform/src/main/resources/mapper/nursing/HealthAssessmentDataCollectionMapper.xml
+文件: xhzb-nursing-platform/src/main/resources/mapper/nursing/KnowledgeBaseMapper.xml
 
 关键 SQL:
-- selectHealthAssessmentDataCollectionList: 多字段等值过滤（basic_info, health_assessment, daily_living_activities, mental_state, perception_communication, social_participation, assessment_details)
+- selectKnowledgeBaseList: title = ?, category = ?, tags = ?, status, priority
 
 问题点与建议:
-- 表结构看起来以大文本字段为主，如果这些字段需要等值过滤，索引的使用需谨慎（MySQL 对 TEXT 列索引有限制）。如果字段为 JSON/字符串，且需要按其中某些标识过滤，考虑拆分字段或在应用层做筛选
-- 若仅少量字段被频繁等值查询，请为这些字段建单列索引（例如 basic_info）
+- 对于 category/status/priority 等低基数字段，单列索引有利于过滤
+- tags 和 title 若用于全文搜索，建议 FULLTEXT 索引或外部搜索系统
 
 建议DDL:
-ALTER TABLE health_assessment_data_collection ADD INDEX idx_health_basic_info (basic_info(100)); -- prefix index, 100 chars, 视字段实际长度调整
+ALTER TABLE knowledge_base ADD INDEX idx_kb_category (category);
+ALTER TABLE knowledge_base ADD INDEX idx_kb_status (status);
+ALTER TABLE knowledge_base ADD INDEX idx_kb_priority (priority);
+-- 对标题/标签的全文搜索
+-- ALTER TABLE knowledge_base ADD FULLTEXT INDEX ft_kb_title_tags (title, tags);
 
 回滚:
-ALTER TABLE health_assessment_data_collection DROP INDEX idx_health_basic_info;
+ALTER TABLE knowledge_base DROP INDEX idx_kb_category;
+ALTER TABLE knowledge_base DROP INDEX idx_kb_status;
+ALTER TABLE knowledge_base DROP INDEX idx_kb_priority;
+-- ALTER TABLE knowledge_base DROP INDEX ft_kb_title_tags;
 
 验证:
-- EXPLAIN 代表性查询
-- 注意 MySQL 对前缀索引的选择性与性能影响
+- EXPLAIN SELECT ... WHERE category = ?; EXPLAIN SELECT ... WHERE priority = ?
+
+
+## NursingLevelMapper & NursingPlanMapper — 分析（合并摘要）
+
+文件: xhzb-nursing-platform/src/main/resources/mapper/nursing/NursingLevelMapper.xml
+          xhzb-nursing-platform/src/main/resources/mapper/nursing/NursingPlanMapper.xml
+
+关键 SQL:
+- NursingLevel: join nursing_plan on lplan_id; where nl.name LIKE '%', nl.status = ?
+- NursingPlan: plan_name LIKE '%', status = ?
+
+问题点与建议:
+- name/plan_name 的 leading wildcard LIKE 无法命中索引；若需要模糊搜索，建议前缀或 FULLTEXT
+- status 为常用过滤字段，添加单列索引能加速
+- nl.lplan_id 是 join 字段（nl.left join nursing_plan np on nl.lplan_id = np.id），应确保 lplan_id 与 np.id 有索引
+
+建议DDL:
+ALTER TABLE nursing_level ADD INDEX idx_nl_status (status);
+ALTER TABLE nursing_plan ADD INDEX idx_np_status (status);
+ALTER TABLE nursing_level ADD INDEX idx_nl_lplan (lplan_id);
+
+回滚:
+ALTER TABLE nursing_level DROP INDEX idx_nl_status;
+ALTER TABLE nursing_plan DROP INDEX idx_np_status;
+ALTER TABLE nursing_level DROP INDEX idx_nl_lplan;
+
+验证:
+- EXPLAIN selectNursingLevelList（检查 join 使用 np.id）
 
