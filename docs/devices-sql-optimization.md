@@ -1,105 +1,38 @@
 
 
-## HealthAssessmentMapper — 分析
+## RoomMapper — 分析
 
-文件: xhzb-nursing-platform/src/main/resources/mapper/nursing/HealthAssessmentMapper.xml
-
-关键 SQL:
-- selectHealthAssessmentList: elder_name LIKE '%', id_card = ?, elder_id = ?, core_suggestion = ?, check_in_status, evaluation_progress
-
-问题点与建议:
-- elder_name 使用 leading-wildcard LIKE，建议改为前缀或 FULLTEXT，如果频繁按 elder_id、id_card 查询请加索引
-- 建议为 id_card、elder_id、check_in_status 建索引
-
-建议DDL:
-ALTER TABLE health_assessment ADD INDEX idx_ha_idcard (id_card);
-ALTER TABLE health_assessment ADD INDEX idx_ha_elder (elder_id);
-ALTER TABLE health_assessment ADD INDEX idx_ha_checkin_status (check_in_status);
-
-回滚:
-ALTER TABLE health_assessment DROP INDEX idx_ha_idcard;
-ALTER TABLE health_assessment DROP INDEX idx_ha_elder;
-ALTER TABLE health_assessment DROP INDEX idx_ha_checkin_status;
-
-验证:
-- EXPLAIN SELECT ... WHERE id_card = ?; EXPLAIN SELECT ... WHERE elder_id = ?
-
-
-## HealthAssessmentReportMapper — 分析（摘要）
-
-文件: xhzb-nursing-platform/src/main/resources/mapper/nursing/HealthAssessmentReportMapper.xml
+文件: xhzb-nursing-platform/src/main/resources/mapper/nursing/RoomMapper.xml
 
 关键 SQL:
-- selectHealthAssessmentReportList: 多字段动态等值与少量 LIKE
+- selectRoomList: 代码/排序/类型/楼层/删除标志的条件过滤
+- selectByFloorId / selectByFloorIdWithNur / getRoomsWithDeviceByFloorId: 多表 LEFT JOIN（room->floor->room_type->bed->elder->device）按 r.floor_id 过滤并排序
+- getRoomOne: 简单 join floor/room_type by room.id
 
 问题点与建议:
-- 表字段很多，重点索引应聚焦在高频等值查找字段：health_assessment_id、assessment_time、check_in_status
-- 建议为 health_assessment_id 建索引，必要时为 assessment_time 建索引以支持时间范围查询
+- 过滤条件中 floor_id、code、is_deleted 应有索引以支持 WHERE r.floor_id = ? 以及 r.code = ? 的查找
+- selectByFloorId 与 getRoomsWithDeviceByFloorId 是按 floor_id 大量聚合/连接，floor_id 应有索引（通常为外键会有），另外用于 ORDER BY 的 r.sort, r.create_time 如果希望避免 filesort 可考虑联合索引 (floor_id, sort, create_time DESC)
+- 多表 JOIN 中 device 的绑定条件（d.binding_location, d.location_type, d.physical_location_type）应有组合索引以加速 LEFT JOIN
+- elder 的床位 join b.id = e.bed_id 需要 bed.id 和 e.bed_id 的索引（一般主键/外键已有）
+- selectByFloorId 使用 left join room_type rt on rt.name = r.type_name —— 如果 room_type.name 不是主键，按 name join 可能慢，建议 room.type_name 改为 FK 指向 room_type.id 或对 room_type.name 建索引
 
 建议DDL:
-ALTER TABLE health_assessment_report ADD INDEX idx_har_assessment (health_assessment_id);
-ALTER TABLE health_assessment_report ADD INDEX idx_har_time (assessment_time);
+ALTER TABLE room ADD INDEX idx_room_floor (floor_id);
+ALTER TABLE room ADD INDEX idx_room_code (code);
+ALTER TABLE room ADD INDEX idx_room_floor_sort_time (floor_id, sort, create_time DESC);
+ALTER TABLE device ADD INDEX idx_device_binding_loc_type_phys (binding_location, location_type, physical_location_type);
+-- 如果 room_type.name 频繁用于 join
+ALTER TABLE room_type ADD INDEX idx_roomtype_name (name);
 
 回滚:
-ALTER TABLE health_assessment_report DROP INDEX idx_har_assessment;
-ALTER TABLE health_assessment_report DROP INDEX idx_har_time;
+ALTER TABLE room DROP INDEX idx_room_floor;
+ALTER TABLE room DROP INDEX idx_room_code;
+ALTER TABLE room DROP INDEX idx_room_floor_sort_time;
+ALTER TABLE device DROP INDEX idx_device_binding_loc_type_phys;
+ALTER TABLE room_type DROP INDEX idx_roomtype_name;
 
 验证:
-- EXPLAIN on representative queries
+- EXPLAIN selectByFloorId / getRoomsWithDeviceByFloorId
+- 期望 r 使用 idx_room_floor，device 使用 idx_device_binding_loc_type_phys
 
-
-## KnowledgeBaseMapper — 分析
-
-文件: xhzb-nursing-platform/src/main/resources/mapper/nursing/KnowledgeBaseMapper.xml
-
-关键 SQL:
-- selectKnowledgeBaseList: title = ?, category = ?, tags = ?, status, priority
-
-问题点与建议:
-- 对于 category/status/priority 等低基数字段，单列索引有利于过滤
-- tags 和 title 若用于全文搜索，建议 FULLTEXT 索引或外部搜索系统
-
-建议DDL:
-ALTER TABLE knowledge_base ADD INDEX idx_kb_category (category);
-ALTER TABLE knowledge_base ADD INDEX idx_kb_status (status);
-ALTER TABLE knowledge_base ADD INDEX idx_kb_priority (priority);
--- 对标题/标签的全文搜索
--- ALTER TABLE knowledge_base ADD FULLTEXT INDEX ft_kb_title_tags (title, tags);
-
-回滚:
-ALTER TABLE knowledge_base DROP INDEX idx_kb_category;
-ALTER TABLE knowledge_base DROP INDEX idx_kb_status;
-ALTER TABLE knowledge_base DROP INDEX idx_kb_priority;
--- ALTER TABLE knowledge_base DROP INDEX ft_kb_title_tags;
-
-验证:
-- EXPLAIN SELECT ... WHERE category = ?; EXPLAIN SELECT ... WHERE priority = ?
-
-
-## NursingLevelMapper & NursingPlanMapper — 分析（合并摘要）
-
-文件: xhzb-nursing-platform/src/main/resources/mapper/nursing/NursingLevelMapper.xml
-          xhzb-nursing-platform/src/main/resources/mapper/nursing/NursingPlanMapper.xml
-
-关键 SQL:
-- NursingLevel: join nursing_plan on lplan_id; where nl.name LIKE '%', nl.status = ?
-- NursingPlan: plan_name LIKE '%', status = ?
-
-问题点与建议:
-- name/plan_name 的 leading wildcard LIKE 无法命中索引；若需要模糊搜索，建议前缀或 FULLTEXT
-- status 为常用过滤字段，添加单列索引能加速
-- nl.lplan_id 是 join 字段（nl.left join nursing_plan np on nl.lplan_id = np.id），应确保 lplan_id 与 np.id 有索引
-
-建议DDL:
-ALTER TABLE nursing_level ADD INDEX idx_nl_status (status);
-ALTER TABLE nursing_plan ADD INDEX idx_np_status (status);
-ALTER TABLE nursing_level ADD INDEX idx_nl_lplan (lplan_id);
-
-回滚:
-ALTER TABLE nursing_level DROP INDEX idx_nl_status;
-ALTER TABLE nursing_plan DROP INDEX idx_np_status;
-ALTER TABLE nursing_level DROP INDEX idx_nl_lplan;
-
-验证:
-- EXPLAIN selectNursingLevelList（检查 join 使用 np.id）
 
