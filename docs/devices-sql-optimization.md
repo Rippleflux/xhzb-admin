@@ -1,48 +1,94 @@
 
 
-## AiConversationMapper — 分析
+## CheckInConfigMapper — 分析
 
-文件: xhzb-nursing-platform/src/main/resources/mapper/nursing/AiConversationMapper.xml
-
-关键 SQL:
-- selectConversationListByUserId: select id, name, create_by, update_by, create_time, update_time from ai_conversation where create_by = #{createBy} order by create_time desc
-
-问题点与建议:
-- create_by 字段用于等值过滤且按 create_time 排序，应确保存在复合索引 (create_by, create_time DESC) 以避免 filesort 并支持索引排序。
-- 若 create_by 基本是低基数（少量用户），单列索引加上排序可能仍扫描较多行，但复合索引仍然优于无索引。
-
-建议DDL:
-ALTER TABLE ai_conversation ADD INDEX idx_ai_conv_create_by_time (create_by, create_time DESC);
-
-回滚:
-ALTER TABLE ai_conversation DROP INDEX idx_ai_conv_create_by_time;
-
-验证:
-- EXPLAIN SELECT ... WHERE create_by = ? ORDER BY create_time DESC
-- 期望: key = idx_ai_conv_create_by_time, type = ref 或 range, Extra 不包含 Using filesort
-
-
-## AiMessageMapper — 分析
-
-文件: xhzb-nursing-platform/src/main/resources/mapper/nursing/AiMessageMapper.xml
+文件: xhzb-nursing-platform/src/main/resources/mapper/nursing/CheckInConfigMapper.xml
 
 关键 SQL:
-- selectMessagesByConversationId: select * from ai_message where conversation_id = #{conversationId} order by create_time
-- deleteByConversationId: delete from ai_message where conversation_id = #{conversationId}
+- selectCheckInConfigList: dynamic WHERE with check_in_id, nursing_level_id, nursing_level_name LIKE '%', fee_start_date, fee_end_date, deposit, nursing_fee, bed_fee, insurance_payment, government_subsidy, other_fees, sort_order
+- selectCheckInConfigById: WHERE id = #{id}
 
 问题点与建议:
-- conversation_id 用于按会话拉取消息，通常该表消息量大（状态不确定），需高效按 conversation_id 查询并按 create_time 排序/读历史
-- 建议复合索引 (conversation_id, create_time)（升序或 DESC 取决于常见查询方向）以让 ORDER BY 利用索引并支持分页
-- select 使用 SELECT *，建议仅查询必要字段以减少 IO（或者在 Mapper 中提供轻量 list 查询）
-- deleteByConversationId 在会话级别清理大量数据时可能耗时，建议改为按批次删除或做软删除并异步归档
+- check_in_id 与 nursing_level_id 是典型的等值过滤字段，建议为其添加单列索引或联合索引（如果查询经常按 check_in_id + nursing_level_id 组合）
+- nursing_level_name 使用 LIKE '%...%' 无法被普通索引利用，若业务要求模糊匹配，考虑改为前缀匹配或全文索引
 
 建议DDL:
-ALTER TABLE ai_message ADD INDEX idx_ai_msg_conv_time (conversation_id, create_time);
+ALTER TABLE check_in_config ADD INDEX idx_cic_checkin (check_in_id);
+ALTER TABLE check_in_config ADD INDEX idx_cic_nursing_level (nursing_level_id);
+-- 若经常按 check_in_id + nursing_level_id 组合查询
+ALTER TABLE check_in_config ADD INDEX idx_cic_checkin_level (check_in_id, nursing_level_id);
 
 回滚:
-ALTER TABLE ai_message DROP INDEX idx_ai_msg_conv_time;
+ALTER TABLE check_in_config DROP INDEX idx_cic_checkin;
+ALTER TABLE check_in_config DROP INDEX idx_cic_nursing_level;
+ALTER TABLE check_in_config DROP INDEX idx_cic_checkin_level;
 
 验证:
-- EXPLAIN SELECT * FROM ai_message WHERE conversation_id = ? ORDER BY create_time
-- 期望: key = idx_ai_msg_conv_time, type = ref 或 range, Extra 不包含 Using filesort
+- EXPLAIN SELECT ... WHERE check_in_id = ? [AND nursing_level_id = ?]
+- 期望: key 包含新增索引，type = ref 或 range
+
+
+## CheckInMapper — 分析
+
+文件: xhzb-nursing-platform/src/main/resources/mapper/nursing/CheckInMapper.xml
+
+关键 SQL:
+- selectCheckInList: dynamic WHERE with elder_name LIKE '%', elder_id, id_card_no, start_date, end_date, nursing_level_name LIKE '%', bed_number, status, sort_order
+- selectCheckInById: WHERE id = #{id}
+
+问题点与建议:
+- elder_name 和 nursing_level_name 使用 leading wildcard LIKE，建议前缀或全文索引替代
+- 常见等值查询：elder_id、id_card_no、bed_number、status 应有单列索引（尤其 elder_id 与 id_card_no 用于定位具体老人记录）
+- 如果查询常按 (elder_id, status) 或 (bed_number, status) 组合筛选，考虑联合索引
+
+建议DDL:
+ALTER TABLE check_in ADD INDEX idx_checkin_elder (elder_id);
+ALTER TABLE check_in ADD INDEX idx_checkin_idcard (id_card_no);
+ALTER TABLE check_in ADD INDEX idx_checkin_bed (bed_number);
+ALTER TABLE check_in ADD INDEX idx_checkin_status (status);
+-- 可选联合索引
+ALTER TABLE check_in ADD INDEX idx_checkin_elder_status (elder_id, status);
+
+回滚:
+ALTER TABLE check_in DROP INDEX idx_checkin_elder;
+ALTER TABLE check_in DROP INDEX idx_checkin_idcard;
+ALTER TABLE check_in DROP INDEX idx_checkin_bed;
+ALTER TABLE check_in DROP INDEX idx_checkin_status;
+ALTER TABLE check_in DROP INDEX idx_checkin_elder_status;
+
+验证:
+- EXPLAIN on representative queries (elder_id lookup, id_card_no lookup)
+
+
+## ContractMapper — 分析
+
+文件: xhzb-nursing-platform/src/main/resources/mapper/nursing/ContractMapper.xml
+
+关键 SQL:
+- selectContractList: dynamic WHERE with elder_id, contract_name LIKE '%', contract_number, agreement_path, third_party_phone, third_party_name LIKE '%', elder_name LIKE '%', start_date, end_date, status, sign_date, termination_submitter, termination_date, termination_agreement_path, sort_order
+- selectContractById: WHERE id = #{id}
+
+问题点与建议:
+- 多处使用 leading-wildcard LIKE (contract_name, third_party_name, elder_name) → consider FULLTEXT or prefix search
+- 常见等值字段：elder_id, contract_number, third_party_phone, status, sign_date — add indexes
+- If contract_number is unique, create a UNIQUE index
+
+建议DDL:
+ALTER TABLE contract ADD INDEX idx_contract_elder (elder_id);
+ALTER TABLE contract ADD INDEX idx_contract_number (contract_number);
+ALTER TABLE contract ADD INDEX idx_contract_phone (third_party_phone);
+ALTER TABLE contract ADD INDEX idx_contract_status (status);
+-- 如果 contract_number 全局唯一
+ALTER TABLE contract ADD UNIQUE INDEX ux_contract_number (contract_number);
+
+回滚:
+ALTER TABLE contract DROP INDEX idx_contract_elder;
+ALTER TABLE contract DROP INDEX idx_contract_number;
+ALTER TABLE contract DROP INDEX idx_contract_phone;
+ALTER TABLE contract DROP INDEX idx_contract_status;
+ALTER TABLE contract DROP INDEX ux_contract_number;
+
+验证:
+- EXPLAIN representative queries (lookup by contract_number, elder_id)
+- 对 LIKE 性能敏感的字段，建议转为全文或外部搜索
 
